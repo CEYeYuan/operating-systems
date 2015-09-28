@@ -5,6 +5,8 @@
 #include "point.h"
 #include "sorted_points.h"
 
+
+
 struct sorted_points {
 	/* you can define this struct to have whatever fields you want. */
 	struct points *head;
@@ -27,6 +29,21 @@ sp_init()
 	//TBD();
 
 	return sp;
+}
+
+void printlist(struct sorted_points *sp){
+		if(sp->size==0)
+			printf("%s","\nempty list\n" );
+		else{
+			printf("\n[");
+			struct points *tmp;
+			tmp=sp->head;
+			while(tmp){
+				printf("(%.0f,%.0f)",tmp->pt->x,tmp->pt->y);
+				tmp=tmp->next;
+			}
+			printf("]   size=%d \n",sp->size);
+		}
 }
 
 void
@@ -58,6 +75,7 @@ sp_add_point(struct sorted_points *sp, double x, double y)
  * e.g., the following order is legal:
  * (0,0), (0, 1), (1, 0), (-2, 0), (0, 2), (2, 0)
  */
+ 	printlist(sp);
 	struct points *p=malloc(sizeof(struct points));
 	p->pt=malloc(sizeof(struct point));
 	point_set(p->pt,x,y);
@@ -78,7 +96,7 @@ sp_add_point(struct sorted_points *sp, double x, double y)
 		}
 		else{
 			if(node->next!=NULL&&point_compare(node->next->pt,p->pt)>0){
-				struct points *tmp=node->next->next;
+				struct points *tmp=node->next;
 				node->next=p;
 				p->next=tmp;
 			}
@@ -100,21 +118,22 @@ sp_add_point(struct sorted_points *sp, double x, double y)
 	}
 	
 	sp->size+=1;
-	return 0;
+	return 1;
 }
 
 int
 sp_remove_first(struct sorted_points *sp, struct point *ret)
 {
+		printlist(sp);
 /* Remove the first point from the sorted list.  Caller provides a pointer to a
  * Point where this procedure stores the values of that point. Returns 1 on
  * success and 0 on failure (empty list). */
- printf("%p\n",ret );
-	if(sp->head==NULL){
+	if(sp->size==0){
 		return 	0;
 	}
 	else{
 		point_set(ret,sp->head->pt->x,sp->head->pt->y);
+		//printf("x=%f y=%f \n",sp->head->pt->x,sp->head->pt->y );
 		struct points *tmp=sp->head->next;
 		free(sp->head->pt);
 		free(sp->head->next);
@@ -132,10 +151,12 @@ sp_remove_last(struct sorted_points *sp, struct point *ret)
 /* Remove the last point from the sorted list, storing its value in
  * *ret. Returns 1 on success and 0 on failure (empty list). */
 	//TBD();
+		printlist(sp);
 	if(sp->size==0){
 		return 0;
 	}
 	else if(sp->size==1){
+		point_set(ret,sp->head->pt->x,sp->head->pt->y);
 		free(sp->head->pt);
 		free(sp->head->next);
 		free(sp->head);
@@ -149,6 +170,7 @@ sp_remove_last(struct sorted_points *sp, struct point *ret)
 			node=node->next;
 			i++;
 		}
+		point_set(ret,node->next->pt->x,node->next->pt->y);
 		free(node->next->pt);
 		free(node->next->next);
 		free(node->next);
@@ -164,11 +186,13 @@ sp_remove_by_index(struct sorted_points *sp, int index, struct point *ret)
  * its value in *ret. Returns 1 on success and 0 on failure (too short list).
  * The first item on the list is at index 0. */
  //use a fake head to eliminate corner cases
+	printlist(sp);
  	if(index>=sp->size||index<0){
  		return 0;
  	}
  	else{
  		if(sp->size==1){
+ 			point_set(ret,sp->head->pt->x,sp->head->pt->y);
  			free(sp->head->pt);
  			free(sp->head->next);
  			free(sp->head);
@@ -181,7 +205,13 @@ sp_remove_by_index(struct sorted_points *sp, int index, struct point *ret)
  				i++;
  			}
  			struct points* tmp=node->next;
- 			node->next=node->next->next;
+ 			point_set(ret,tmp->pt->x,tmp->pt->y);
+ 			
+ 			if(tmp->next!=NULL){
+ 				node->next=tmp->next;
+ 			}
+
+ 			printf("x=%f y=%f\n",tmp->pt->x,tmp->pt->y);
  			free(tmp->pt);
  			free(tmp->next);
  			free(tmp);
@@ -195,6 +225,29 @@ sp_remove_by_index(struct sorted_points *sp, int index, struct point *ret)
 int
 sp_delete_duplicates(struct sorted_points *sp)
 {
-	TBD();
-	return -1;
+	/* Delete any duplicate records. E.g., if two points on the list have
+ * *identical* x and y values, then delete one of them.  Return the number of
+ * records deleted. */
+ 		printlist(sp);
+	int ret=0;
+	if(sp->size==0||sp->size==1)
+		return 0;
+	else {
+		struct points *tmp=sp->head;
+		while(tmp){
+			if(tmp->next && tmp->next->pt->x==tmp->pt->x && tmp->next->pt->y==tmp->pt->y){
+			struct points *link=tmp->next;
+			free(link->pt);
+			free(link->next);
+			free(link);
+			ret++;
+			tmp->next=tmp->next->next;
+			}else
+			tmp=tmp->next;
+		}
+		sp->size-=ret;
+		return ret;
+	}
+
+	
 }
