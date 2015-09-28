@@ -49,21 +49,57 @@ sp_destroy(struct sorted_points *sp)
 int
 sp_add_point(struct sorted_points *sp, double x, double y)
 {
-	//TBD();
-	/*struct point *p;
-	p=(struct point *)malloc(sizeof(struct point));
-	p->x=x;
-	p->y=y;
-	if(sp->pt==NULL)
-		sp->pt=p;
+	/* Note: Points are sorted by their distance from the origin (0,0). If two
+ * points are the same distance form the origin, then the one with a smaller x
+ * coordinate should appear before one with a larger one. If two points are the
+ * same distance and have the same x coordinate, then the one with the smaller
+ * y coordinate should appear first.
+ *
+ * e.g., the following order is legal:
+ * (0,0), (0, 1), (1, 0), (-2, 0), (0, 2), (2, 0)
+ */
+	struct points *p=malloc(sizeof(struct points));
+	p->pt=malloc(sizeof(struct point));
+	point_set(p->pt,x,y);
+	p->next=NULL;
+
+	if(sp->size==0){
+		sp->head=p;
+	}
 	else{
-		while(sp->next!=NULL&&point_compare(sp->pt,p)<0)
-			sp++;
-		//if(sp->next=NULL)
-
-
+		int i=0;
+		struct points *node=sp->head;
+		while(node->next!=NULL&&point_compare(node->next->pt,p->pt)<0){
+			node=node->next;
+			i++;
+		}
+		if(i==sp->size-1){
+			node->next=p;
+		}
+		else{
+			if(node->next!=NULL&&point_compare(node->next->pt,p->pt)>0){
+				struct points *tmp=node->next->next;
+				node->next=p;
+				p->next=tmp;
+			}
+			else{//with same distance
+				while(node->next!=NULL&&point_compare(node->next->pt,p->pt)==0 && node->next->pt->x < p->pt->x){
+					node=node->next;
+					i++;	
+				}
+				while(node->next!=NULL&&point_compare(node->next->pt,p->pt)==0 && node->next->pt->x == p->pt->x && node->next->pt->y < p->pt->y){
+					node=node->next;
+					i++;	
+				}
+				struct points *tmp=node->next;
+				node->next=p;
+				p->next=tmp;
+				
+			}
+		}
+	}
 	
-		}*/
+	sp->size+=1;
 	return 0;
 }
 
