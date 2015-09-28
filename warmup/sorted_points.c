@@ -54,12 +54,11 @@ sp_destroy(struct sorted_points *sp)
 	while(cur!=NULL){
 		struct points* tmp=cur->next;
 		free(cur->pt);
-		free(cur->next);
+		//free(cur->next);
 		free(cur);
 		cur=tmp;
 	}
 	sp->size=0;
-	free(sp->head);
 	free(sp);
 }
 
@@ -75,7 +74,7 @@ sp_add_point(struct sorted_points *sp, double x, double y)
  * e.g., the following order is legal:
  * (0,0), (0, 1), (1, 0), (-2, 0), (0, 2), (2, 0)
  */
- 	printlist(sp);
+ 	//printlist(sp);
 	struct points *p=malloc(sizeof(struct points));
 	p->pt=malloc(sizeof(struct point));
 	point_set(p->pt,x,y);
@@ -124,7 +123,7 @@ sp_add_point(struct sorted_points *sp, double x, double y)
 int
 sp_remove_first(struct sorted_points *sp, struct point *ret)
 {
-		printlist(sp);
+	//	printlist(sp);
 /* Remove the first point from the sorted list.  Caller provides a pointer to a
  * Point where this procedure stores the values of that point. Returns 1 on
  * success and 0 on failure (empty list). */
@@ -134,11 +133,16 @@ sp_remove_first(struct sorted_points *sp, struct point *ret)
 	else{
 		point_set(ret,sp->head->pt->x,sp->head->pt->y);
 		//printf("x=%f y=%f \n",sp->head->pt->x,sp->head->pt->y );
-		struct points *tmp=sp->head->next;
+		//struct points *tmp=sp->head->next;
+		
 		free(sp->head->pt);
-		free(sp->head->next);
+		//free(sp->head->next);
+		/*
+		ATTENTION: JUST change the next pointer !! set head=head->next
+		in other case, you will remove the second element also !!
+		*/
 		free(sp->head);
-		sp->head=tmp;
+		sp->head=sp->head->next;
 		sp->size-=1;
 		return 1;
 
@@ -151,7 +155,7 @@ sp_remove_last(struct sorted_points *sp, struct point *ret)
 /* Remove the last point from the sorted list, storing its value in
  * *ret. Returns 1 on success and 0 on failure (empty list). */
 	//TBD();
-		printlist(sp);
+	//printlist(sp);
 	if(sp->size==0){
 		return 0;
 	}
@@ -160,6 +164,7 @@ sp_remove_last(struct sorted_points *sp, struct point *ret)
 		free(sp->head->pt);
 		free(sp->head->next);
 		free(sp->head);
+		sp->head=NULL;
 		sp->size=0;
 		return 1;
 	}
@@ -172,8 +177,9 @@ sp_remove_last(struct sorted_points *sp, struct point *ret)
 		}
 		point_set(ret,node->next->pt->x,node->next->pt->y);
 		free(node->next->pt);
-		free(node->next->next);
+		//free(node->next->next);
 		free(node->next);
+		node->next=NULL;
 		sp->size-=1;
 		return 1;
 	}
@@ -186,7 +192,7 @@ sp_remove_by_index(struct sorted_points *sp, int index, struct point *ret)
  * its value in *ret. Returns 1 on success and 0 on failure (too short list).
  * The first item on the list is at index 0. */
  //use a fake head to eliminate corner cases
-	printlist(sp);
+	//printlist(sp);
  	if(index>=sp->size||index<0){
  		return 0;
  	}
@@ -194,8 +200,9 @@ sp_remove_by_index(struct sorted_points *sp, int index, struct point *ret)
  		if(sp->size==1){
  			point_set(ret,sp->head->pt->x,sp->head->pt->y);
  			free(sp->head->pt);
- 			free(sp->head->next);
+ 			//free(sp->head->next);
  			free(sp->head);
+ 			sp->head=NULL;
  		}
  		else{
  			struct points *node=sp->head;
@@ -207,14 +214,20 @@ sp_remove_by_index(struct sorted_points *sp, int index, struct point *ret)
  			struct points* tmp=node->next;
  			point_set(ret,tmp->pt->x,tmp->pt->y);
  			
- 			if(tmp->next!=NULL){
- 				node->next=tmp->next;
+ 			if(sp->size-1==index){
+ 				free(tmp->pt);
+ 				//free(tmp->next);
+ 				free(tmp);
+ 				node->next=NULL;
  			}
 
- 			printf("x=%f y=%f\n",tmp->pt->x,tmp->pt->y);
- 			free(tmp->pt);
- 			free(tmp->next);
- 			free(tmp);
+ 			else{
+ 				//printf("x=%f y=%f\n",tmp->pt->x,tmp->pt->y);
+ 				node->next=tmp->next;
+	 			free(tmp->pt);
+	 			free(tmp);
+ 			}
+ 			
  		}
  		sp->size-=1;
  		return 1;
@@ -228,7 +241,7 @@ sp_delete_duplicates(struct sorted_points *sp)
 	/* Delete any duplicate records. E.g., if two points on the list have
  * *identical* x and y values, then delete one of them.  Return the number of
  * records deleted. */
- 		printlist(sp);
+ 	//	printlist(sp);
 	int ret=0;
 	if(sp->size==0||sp->size==1)
 		return 0;
@@ -236,16 +249,17 @@ sp_delete_duplicates(struct sorted_points *sp)
 		struct points *tmp=sp->head;
 		while(tmp){
 			if(tmp->next && tmp->next->pt->x==tmp->pt->x && tmp->next->pt->y==tmp->pt->y){
-			struct points *link=tmp->next;
-			free(link->pt);
-			free(link->next);
-			free(link);
-			ret++;
-			tmp->next=tmp->next->next;
-			}else
+				ret++;
+				struct points *cur=tmp->next;
+				tmp->next=tmp->next->next;
+				free(cur->pt);
+				free(cur);
+			}
+			else
 			tmp=tmp->next;
 		}
 		sp->size-=ret;
+		//printf("%d\n",ret );
 		return ret;
 	}
 
