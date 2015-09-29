@@ -11,18 +11,14 @@ int counter =0;
 
 struct wc {
 	/* you can define this struct to have whatever fields you want. */
-	struct list *bucket ;
+	struct listnode **dict;
 };
 
-struct list{
-	struct listnode *head;
-	int length;
-};
 struct listnode{
 	char * word;
 	int count;
 	struct listnode *next;
-} ;
+} listnode;
 
 long hashCode(char *key, long size){
 
@@ -47,16 +43,7 @@ wc_init(char *word_array, long size)
  * in the array. You can use the isspace() function to look for spaces between
  * words. Note that the array is read only and cannot be modified. */
 
-	/*struct wc **wc=malloc(sizeof(*wc)*size/5);
-	
-	*/
-	struct wc **dict;
-	int j=0;
-	dict=malloc(size/5*sizeof(struct wc*));
-	while(j<size/5){
-		*(dict+j)=NULL;
-		j++;
-	}
+	struct wc *wc=malloc(sizeof(wc));
 	counter=size/5;
 	int i=0;//count the character
 	int start=0;//start of each string
@@ -80,38 +67,37 @@ wc_init(char *word_array, long size)
 		start=i;
 
 		long index=hashCode(str,size/5);
-		// printf("%s is hashed to index %ld\n",str,index );
+		//printf("%s is hashed to index %ld   size/5=%ld \n",str,index,size/5 );
+		int j=0;
+		wc->dict=malloc(size/5*sizeof(struct listnode*));
+		while(j<size/5){
+			wc->dict[j]=NULL;
+			j++;
+		}
 		
 		
-		if(!dict[index]){
+		
+		if(!wc->dict[index]){
+			
 			//this is the first word that hashed to that bucket
 			//init the bucket and linked list
-			dict[index]=malloc(sizeof(struct wc));
-			struct list* first = malloc(sizeof(struct list));
-			first->head=malloc(sizeof(struct listnode));
-			first->head->word=malloc(sizeof(str));
-			strcpy(first->head->word,str);
-			first->length=1;
-			dict[index]->bucket=first;
-			first->head->next=NULL;
-			printf("%s \n",dict[index]->bucket->head->word);
+			struct listnode* node = malloc(sizeof(listnode));
+			node->word=malloc(sizeof(str));
+			node->next=NULL;
+			strcpy(node->word,str);
+			node->count=1;
+			wc->dict[index]=node;
+			//printf("%s\n", (*wc->dict[index]).word);
 		}
 		
 		else{
-			//printf("%p not null?\n",wc[index]->bucket );
-			//printf("%p\n", wc[index]);
-			/*if(wc[index]->item){
-				struct listnode *node=wc[index]->item;
-				printf("%p\n", node);
-			}
-			
-			*/
-			/*
+			struct listnode *node=wc->dict[index];
 			int added=0;
 			while(node->next){
 				if(strcmp(node->word,str)==0){
 					node->count+=1;
 					added=1;
+					printf("%s:sss%d\n",node->word,node->count);
 					break;
 				}
 				else
@@ -123,16 +109,16 @@ wc_init(char *word_array, long size)
 				node->word=malloc(sizeof(str));
 				strcpy(newword->word,str);
 				node->count=1;
+				node->next=newword;
 			}
-			*/
 		}
 		
-		 free(str);
+	    free(str);
 		i++;
 	}
 	
-	assert(dict);
-	return dict[0];
+	assert(wc);
+	return wc;
 }
 
 void
@@ -152,42 +138,35 @@ word2:10
 word3:30
 word4:1
  */
-/*
-printf("%s\n","ssssss" );
+
 int i=0;
+struct listnode *node;
 while(i<counter){
-	struct wc *current=&wc[i];
-	if(current){
-		struct listnode *node=current->item;
-		while(node){
-			printf("%s:%d\n",node->word,node->count);
-			node=node->next;
-		}
-	}
+	node=wc->dict[i];	
+	while(node){
+		printf("%s:%d\n",node->word,node->count);
+		node=node->next;	
+	}	
 	i++;
-}
-	*/
+	}	
 }
 
 void
 wc_destroy(struct wc *wc)
 {
-	/*
+	
 	int i=0;
 	while(i<counter){
-		struct wc *current=&wc[i];
-		if(current){
-			struct listnode *node=current->item;
+		
+			struct listnode *node=wc->dict[i];
 			while(node){
 				struct listnode *tmp=node->next;
 				free(node->word);
 				free(node);
 				node=tmp;
 			}
-		}
-		free(current);
 		i++;
 	}
 	free(wc);
-	*/
+	
 }
