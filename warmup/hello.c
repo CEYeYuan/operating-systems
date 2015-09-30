@@ -4,7 +4,7 @@ int
 main()
 {
 	//TBD();
-        printf("%s","Hello world");
+        printf("%s\n","Hello world");
 
 	return 0;
 }

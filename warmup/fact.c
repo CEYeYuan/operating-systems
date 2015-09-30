@@ -5,7 +5,7 @@ int factorial(int input);
 int main(int argc,char* argv[])
 {
 	//TBD();
-	if(argc==1||argv[1][0]>'9'||argv[1][0]<'0')
+	if(argc==1||argv[1][0]>'9'||argv[1][0]<'0'||atof(argv[1])-atoi(argv[1])!=0)
 		printf("%s\n","Huh?");
 	else if(atoi(argv[1])>12)
 		printf("%s\n","Overflow" );
