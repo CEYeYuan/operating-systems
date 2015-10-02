@@ -64,6 +64,9 @@ wc_init(char *word_array, long size)
 	while(i<size){
 		len=0;
 		char *str=malloc(sizeof(char)*100);
+		while(i<size&&isspace(*(word_array+i))){
+			i++;
+		}
 		while(i<size&& !isspace(*(word_array+i))){
 			*(str+len)=*(word_array+i);
 			i++;
