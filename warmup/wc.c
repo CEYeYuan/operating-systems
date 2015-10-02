@@ -63,7 +63,7 @@ wc_init(char *word_array, long size)
 		}
 	while(i<size){
 		len=0;
-		char *str=malloc(sizeof(char)*100);
+		char *str=malloc(sizeof(char)*500);
 		while(i<size&&isspace(*(word_array+i))){
 			i++;
 		}
@@ -112,7 +112,8 @@ wc_init(char *word_array, long size)
 				}
 				else{
 					struct listnode* newword = malloc(sizeof(struct listnode));
-					newword->word=malloc(strlen(str));
+					printf ("%s", str);
+					newword->word=malloc(strlen(str)*sizeof(char));
 					strcpy(newword->word,str);
 					newword->count=1;
 					newword->next=NULL;
@@ -152,7 +153,7 @@ struct listnode *node;
 while(i<counter){
 	node=wc->dict[i];	
 	while(node){
-		printf("%s:%ld\n",node->word,node->count);
+		//printf("%s:%ld\n",node->word,node->count);
 		node=node->next;	
 	}	
 	i++;
