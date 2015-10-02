@@ -52,8 +52,8 @@ wc_init(char *word_array, long size)
 	long  i=0;//count the character
 	int len=0;//length of each string
 	long j=0;
-	wc->dict=malloc((1+size/3513)*sizeof(struct listnode*));
-	while(j<size/3513+1){
+	wc->dict=malloc((counter)*sizeof(struct listnode*));
+	while(j<counter){
 		wc->dict[j]=NULL;
 		j++;		
 	}
@@ -77,14 +77,14 @@ wc_init(char *word_array, long size)
 		while(i<size&&isspace(*(word_array+i))){
 			i++;
 		}
-		long index=hashCode(str,size/3513+1);
+		long index=hashCode(str,counter);
 		
 		if(!wc->dict[index]){
 
 			//this is the first word that hashed to that bucket
 			//init the bucket and linked list
 			struct listnode* node= malloc(sizeof(struct listnode));
-			node->word=malloc(strlen(str));
+			node->word=malloc(strlen(str)+1);
 			node->next=NULL;
 			strcpy(node->word,str);
 			node->count=1;
@@ -112,8 +112,7 @@ wc_init(char *word_array, long size)
 				}
 				else{
 					struct listnode* newword = malloc(sizeof(struct listnode));
-					printf ("%s", str);
-					newword->word=malloc(strlen(str)*sizeof(char));
+					newword->word=malloc(strlen(str)*sizeof(char)+1);
 					strcpy(newword->word,str);
 					newword->count=1;
 					newword->next=NULL;
@@ -153,7 +152,7 @@ struct listnode *node;
 while(i<counter){
 	node=wc->dict[i];	
 	while(node){
-		//printf("%s:%ld\n",node->word,node->count);
+		printf("%s:%ld\n",node->word,node->count);
 		node=node->next;	
 	}	
 	i++;
