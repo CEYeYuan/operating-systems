@@ -53,7 +53,7 @@ wc_init(char *word_array, long size)
 	int len=0;//length of each string
 	long j=0;
 	wc->dict=malloc((1+size/3513)*sizeof(struct listnode*));
-	while(j<size/35+1){
+	while(j<size/3513+1){
 		wc->dict[j]=NULL;
 		j++;		
 	}
