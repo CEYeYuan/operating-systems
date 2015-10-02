@@ -25,7 +25,6 @@ long hashCode(char *key, long size){
     long hashVal = 0;
     int i = 0;
     while( i < strlen(key)) {
-    	//printf("%c\n", *(key+i));
       hashVal = (127 * hashVal + *(key+i)) % size;
       i++;
     }
@@ -49,12 +48,11 @@ wc_init(char *word_array, long size)
 	
 	struct wc *wc=malloc(sizeof(wc));
 	if(size<=0)	return wc;
-	counter=size/35+1;
+	counter=size/3513+1;
 	long  i=0;//count the character
 	int len=0;//length of each string
 	long j=0;
-	wc->dict=malloc((1+size/35)*sizeof(struct listnode*));
-	//printf("size = %ld\n",size/5);
+	wc->dict=malloc((1+size/3513)*sizeof(struct listnode*));
 	while(j<size/35+1){
 		wc->dict[j]=NULL;
 		j++;		
@@ -76,7 +74,7 @@ wc_init(char *word_array, long size)
 		while(i<size&&isspace(*(word_array+i))){
 			i++;
 		}
-		long index=hashCode(str,size/35+1);
+		long index=hashCode(str,size/3513+1);
 		
 		if(!wc->dict[index]){
 
