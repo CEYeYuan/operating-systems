@@ -50,9 +50,9 @@ wc_init(char *word_array, long size)
 	struct wc *wc=malloc(sizeof(wc));
 	if(size<=0)	return wc;
 	counter=size/35+1;
-	unsigned long  i=0;//count the character
+	long  i=0;//count the character
 	int len=0;//length of each string
-	unsigned long j=0;
+	long j=0;
 	wc->dict=malloc((1+size/35)*sizeof(struct listnode*));
 	//printf("size = %ld\n",size/5);
 	while(j<size/35+1){
