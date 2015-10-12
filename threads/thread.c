@@ -38,29 +38,57 @@ thread_compare(struct thread *a,struct thread *b){
 		return -1;
 }
 
+struct thread *
+removeById(struct list *queue,Tid tid){
+	struct thread * pt=NULL;
+	if(queue->size==0)
+		return pt;
+	else{
+		struct thread * tmp=queue->head->next;
+		struct thread *cur=queue->head;
+		if(cur->id==tid){
+			queue->head=tmp;
+			queue->size-=1;
+			return cur;
+		}
+		while(tmp!=NULL){
+			if(tmp->id!=tid){
+				cur=cur->next;
+				tmp=tmp->next;
+			}
+			else
+				break;
+		}
+		if(tmp==NULL)
+			return pt;
+		else{
+			pt=tmp;
+			cur->next=tmp->next;
+			queue->size-=1;
+			return pt;
+		}
+
+		
+	}
+}
+
 void
-add_thread(struct list *readyqueue, struct thread *thread)
+add_thread(struct list *queue, struct thread *thread)
 {
-	if(readyqueue->size==0){
-		readyqueue->head=malloc(sizeof(struct thread));
-		readyqueue->head=thread;
+	if(queue->size==0){
+		queue->head=thread;
 	}
 	else{
-		struct 	thread *head,*tmp;
-		head=readyqueue->head;
-		while(head->next!=NULL&&thread_compare(head,thread)<0){
+		struct 	thread *head;
+		head=queue->head;
+		while(head->next!=NULL){
 			head=head->next;
 		}
-		if(head->next==NULL)
-			head->next=thread;
-		else{
-			tmp=head->next;
-			head->next=thread;
-			thread->next=tmp;
-		}
+		head->next=thread;
 	}
-	readyqueue->size+=1;
+	queue->size+=1;
 }
+
 
 
 struct thread *current;
@@ -129,12 +157,63 @@ thread_yield(Tid want_tid)
  *		   run. this can happen is response to a call with tid set to
  *		   THREAD_ANY. */
 	//TBD();
-	return THREAD_FAILED;
+ 	if(want_tid==THREAD_SELF||want_tid==current->id)
+ 		return current->id;
+ 	else if(want_tid==THREAD_ANY){
+ 		if(readyQueue->size==0)
+ 			return THREAD_NONE;
+ 		else {
+ 			int mark=0;//DO NOT WANT INFINITE LOOP BETWEEN SAVE/RECOVERY!!!!!!!!! 
+ 			struct thread *old=current;
+ 			old->status=ready;
+ 			current=readyQueue->head;
+ 			current->status=running;
+ 			readyQueue->head=readyQueue->head->next;
+ 			readyQueue->size-=1;
+ 			add_thread(readyQueue,old);
+ 			int ret=current->id;//necessary,otherwise,when switch back,it will return the 
+ 			//original id
+ 			getcontext(old->mycontext);
+ 			mark++;
+ 			if(mark>=2) 
+ 				return ret;
+ 			else{
+ 				setcontext(current->mycontext);
+ 				return ret;
+ 			}
+ 			//when switch back, current is still the running thread, so it won't 
+ 			//return the new thread id;	
+ 		}
+ 	}
+ 	else{
+ 		struct thread *target=removeById(readyQueue,want_tid);
+ 		if(target==NULL)
+			return THREAD_INVALID;
+		else{
+			int mark=0;//DO NOT WANT INFINITE LOOP BETWEEN SAVE/RECOVERY!!!!!!!!! 
+ 			struct thread *old=current;
+ 			old->status=ready;
+ 			current=target;
+ 			current->status=running;
+ 			add_thread(readyQueue,old);
+ 			int ret=current->id;//necessary,otherwise,when switch back,it will return the 
+ 			//original id
+ 			getcontext(old->mycontext);
+ 			mark++;
+ 			if(mark>=2) 
+ 				return ret;
+ 			else{
+ 				setcontext(current->mycontext);
+ 				return ret;
+ 			}
+		}
+
+ 	}
 }
 
 Tid
 thread_exit(Tid tid)
-{
+{ 
 	TBD();
 	return THREAD_FAILED;
 }
