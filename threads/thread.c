@@ -317,8 +317,69 @@ thread_yield(Tid want_tid)
 Tid
 thread_exit(Tid tid)
 { 
-	TBD();
-	return THREAD_FAILED;
+
+/* destroy the thread whose identifier is tid. The calling thread continues to
+ * execute and receives the result of the call. tid can be identifier of any
+ * available thread or the following constants:
+ *
+ * THREAD_ANY:     destroy any thread except the caller.
+ * THREAD_SELF:    destroy the calling thread and reclaim its resources. in this
+ *		   case, the calling thread obviously doesn't run any
+ *		   longer. some other ready thread is run.
+ *
+ * Upon success, return the identifier of the destroyed thread. A new thread
+ * should be able to reuse this identifier. Upon failure, the calling thread
+ * continues running, and returns the following:
+ *
+ * THREAD_INVALID: identifier tid does not correspond to a valid thread.
+ * THREAD_NONE:	   no more threads, other than the caller, are available to
+ *		   destroy, i.e., this is the last thread in the system. This
+ *		   can happen in response to a call with tid set to THREAD_ANY
+ *		   or THREAD_SELF. */
+	if(tid==THREAD_ANY){
+		struct thread *pt=removeFirst(readyQueue);
+		if(pt==NULL)
+			return THREAD_NONE;
+		else{
+			arr[tid]=0;
+			void* stack=(*pt->mycontext).uc_mcontext.gregs[REG_RSP];
+			free(stack);
+			free(pt->mycontext);
+			free(pt);
+			return tid;
+		}
+
+	}
+	else if(tid==THREAD_SELF||tid==current->id){
+		if(readyQueue->size==0)
+			return THREAD_NONE;
+		else{
+			thread_yield(THREAD_ANY);
+			struct thread *pt=removeById(tid);
+			arr[tid]=0;
+			void* stack=(*pt->mycontext).uc_mcontext.gregs[REG_RSP];
+			free(stack);
+			free(pt->mycontext);
+			free(pt);
+			return tid;
+		}
+	}
+
+	else{
+		struct thread *pt=removeById(tid);
+		if(pt==NULL)
+			return THREAD_INVALID;
+		else{
+			arr[tid]=0;
+			void* stack=(*pt->mycontext).uc_mcontext.gregs[REG_RSP];
+			free(stack);
+			free(pt->mycontext);
+			free(pt);
+			return tid;
+		}
+
+	}
+	}
 }
 
 /*******************************************************************
