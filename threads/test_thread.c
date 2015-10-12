@@ -6,7 +6,7 @@
 #include "test_thread.h"
 
 #define DURATION  60000000
-#define NTHREADS       128
+#define NTHREADS       	128
 #define LOOPS	        10
 
 static void grand_finale();
@@ -65,6 +65,7 @@ test_basic()
 	int ii, jj;
 	Tid child[NTHREADS];
 	char msg[NTHREADS][1024];
+	printf("%s\n","before thread create\n" );
 	for (ii = 0; ii < NTHREADS; ii++) {
 		ret = snprintf(msg[ii], 1023, "hello from thread %3d", ii);
 		assert(ret > 0);
@@ -73,6 +74,7 @@ test_basic()
 	}
 	printf("my id is %d\n", thread_id());
 	for (ii = 0; ii < NTHREADS; ii++) {
+		printf("child[ii]= %d\n",child[ii] );
 		ret = thread_yield(child[ii]);
 		assert(ret == child[ii]);
 	}

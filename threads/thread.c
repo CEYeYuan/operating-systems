@@ -29,6 +29,37 @@ struct list {
 	int size;
 };
 
+/* thread starts by calling thread_stub. The arguments to thread_stub are the
+ * thread_main() function, and one argument to the thread_main() function. */
+void
+thread_stub(void (*thread_main)(void *), void *arg)
+{
+	Tid ret;
+
+	thread_main(arg); // call thread_main() function with arg
+	ret = thread_exit(THREAD_SELF);
+	// we should only get here if we are the last thread. 
+	assert(ret == THREAD_NONE);
+	// all threads are done, so process should exit
+	exit(0);
+}
+
+
+void printlist(struct list *sp,struct thread *cur){
+		printf("%s %d        ","running thread ",cur->id );
+		if(sp->size==0)
+			printf("%s","ready queue is empty list\n" );
+		else{
+			printf("ready queue: [");
+			struct thread *tmp;
+			tmp=sp->head;
+			while(tmp){
+				printf("%d,",tmp->id);
+				tmp=tmp->next;
+			}
+			printf("]   size=%d \n",sp->size);
+		}
+}
 int 
 thread_compare(struct thread *a,struct thread *b){
 	//compare the id of two thread; no duplicate id are allowed
@@ -37,7 +68,19 @@ thread_compare(struct thread *a,struct thread *b){
 	else
 		return -1;
 }
+struct thread *
+removeFirst(struct list *queue){
+	if(queue->size==0){
+		return NULL;
+	}
+	else{
+		struct thread *pt=queue->head;
+		queue->head=queue->head->next;
+		queue->size-=1;
+		return pt;
+	}
 
+}
 struct thread *
 removeById(struct list *queue,Tid tid){
 	struct thread * pt=NULL;
@@ -74,7 +117,7 @@ removeById(struct list *queue,Tid tid){
 
 void
 add_thread(struct list *queue, struct thread *thread)
-{
+{	thread->next=NULL;
 	if(queue->size==0){
 		queue->head=thread;
 	}
@@ -113,6 +156,7 @@ thread_init(void)
 		arr[i]=0;
 		i++;
 	}
+	arr[0]=1;
 }
 
 Tid
@@ -131,12 +175,68 @@ identifier can be reused by another thread created later.*/
 	return THREAD_INVALID;
 }
 
+
+
 Tid
 thread_create(void (*fn) (void *), void *parg)
 {
-	TBD();
-	return THREAD_FAILED;
+	//printlist(readyQueue,current);
+/* create a thread that starts running the function fn(arg). Upon success,
+ * return the thread identifier. On failure, return the following:
+ *
+ * THREAD_NOMORE: no more threads can be created.
+ * THREAD_NOMEMORY: no more memory available to create a thread stack. 
+ 
+
+ to create a new thread, you will use getcontext to create a valid context,
+ but you will leave the current thread running; you (the current thread, actually) 
+ will then change a few registers in this valid context to initialize it as a new thread, 
+ and put this new thread into the ready queue; finally, at some point, the new thread will
+ be chosen by the scheduler, and it will run when setcontext is called on this new 
+ thread's context.
+
+when creating a thread, you can't just make a copy of the current thread's context (using getcontext).
+You need to make a copy and then change four things:
+You need to change the program counter to point to the first function that the thread should run.
+You need to allocate a new stack.
+You need to change the stack pointer to point to the top of the new stack.
+You need to setup the parameters to the first function.
+ */
+	if(readyQueue->size+1>=THREAD_MAX_THREADS)
+		return THREAD_NOMORE;
+	else{
+		struct thread *another=malloc(sizeof(thread));
+		another->mycontext=malloc(sizeof(ucontext_t));
+		getcontext(another->mycontext);
+		void *stack=malloc(THREAD_MIN_STACK*sizeof(char));
+		if(stack==NULL){
+			free(another->mycontext);
+			free(another);
+			return THREAD_NOMEMORY;
+		}
+		else{
+			(*another->mycontext).uc_mcontext.gregs[REG_RIP]=(unsigned long)&thread_stub;
+			(*another->mycontext).uc_mcontext.gregs[REG_RSP]=(unsigned long)stack;
+			(*another->mycontext).uc_mcontext.gregs[REG_RDI]=(unsigned long)fn;//first argument
+			(*another->mycontext).uc_mcontext.gregs[REG_RSI]=(unsigned long)parg;//second argument
+			int id=0;
+			while(arr[id]==1&&id<THREAD_MAX_THREADS-1){
+				id++;
+			}
+			arr[id]=1;
+			another->id=id;
+			add_thread(readyQueue,another);
+			return id;
+		}
+	}
 }
+
+
+
+
+
+
+
 
 Tid
 thread_yield(Tid want_tid)
@@ -157,19 +257,20 @@ thread_yield(Tid want_tid)
  *		   run. this can happen is response to a call with tid set to
  *		   THREAD_ANY. */
 	//TBD();
+ //printlist(readyQueue,current);
  	if(want_tid==THREAD_SELF||want_tid==current->id)
  		return current->id;
  	else if(want_tid==THREAD_ANY){
- 		if(readyQueue->size==0)
+ 		struct thread *pt=removeFirst(readyQueue);
+ 		if(pt==NULL)
  			return THREAD_NONE;
  		else {
  			int mark=0;//DO NOT WANT INFINITE LOOP BETWEEN SAVE/RECOVERY!!!!!!!!! 
  			struct thread *old=current;
  			old->status=ready;
- 			current=readyQueue->head;
+ 			old->next=NULL;
+ 			current=pt;
  			current->status=running;
- 			readyQueue->head=readyQueue->head->next;
- 			readyQueue->size-=1;
  			add_thread(readyQueue,old);
  			int ret=current->id;//necessary,otherwise,when switch back,it will return the 
  			//original id
@@ -195,6 +296,8 @@ thread_yield(Tid want_tid)
  			old->status=ready;
  			current=target;
  			current->status=running;
+ 			current->next=NULL;
+ 			old->next=NULL;
  			add_thread(readyQueue,old);
  			int ret=current->id;//necessary,otherwise,when switch back,it will return the 
  			//original id
