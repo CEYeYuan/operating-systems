@@ -6,7 +6,7 @@
 #include "test_thread.h"
 
 #define DURATION  60000000
-#define NTHREADS       	128
+#define NTHREADS       	1
 #define LOOPS	        10
 
 static void grand_finale();

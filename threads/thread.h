@@ -2,7 +2,7 @@
 #define _THREAD_H_
 
 typedef int Tid;
-#define THREAD_MAX_THREADS 1024
+#define THREAD_MAX_THREADS 3
 #define THREAD_MIN_STACK 32768
 
 /*

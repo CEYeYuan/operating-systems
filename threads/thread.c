@@ -9,7 +9,8 @@
 enum state{ 
 	running=1,
 	ready=2,
-	blocked=3
+	blocked=3,
+	exited=4
 };
 
 
@@ -19,6 +20,7 @@ typedef struct thread {
 	/* a linked list of thread */
 	ucontext_t *mycontext;
 	enum state status;
+	void *sp_base;
 	Tid id;
 	struct thread *next;
 } thread;
@@ -53,9 +55,11 @@ void printlist(struct list *sp,struct thread *cur){
 			printf("ready queue: [");
 			struct thread *tmp;
 			tmp=sp->head;
-			while(tmp){
+			int i=0;
+			while(i<sp->size){
 				printf("%d,",tmp->id);
 				tmp=tmp->next;
+				i++;
 			}
 			printf("]   size=%d \n",sp->size);
 		}
@@ -146,6 +150,7 @@ thread_init(void)
 	current->mycontext=malloc(sizeof(ucontext_t));
 	getcontext(current->mycontext);
 	current->id=0;
+	current->sp_base=NULL;
 	current->status=running;
 	current->next=NULL;//this field should never get used.
 	readyQueue=malloc(sizeof (struct list));
@@ -217,6 +222,10 @@ You need to setup the parameters to the first function.
 		else{
 			(*another->mycontext).uc_mcontext.gregs[REG_RIP]=(unsigned long)&thread_stub;
 			(*another->mycontext).uc_mcontext.gregs[REG_RSP]=(unsigned long)(stack+THREAD_MIN_STACK);
+			//should store the highest address; but both malloc and free should use the lowest address
+			another->sp_base=stack;
+			//why do we need another member in the thread? becasue the register value for RSP will
+			//change as code executing, it's not necessary the base address when we exit the thread
 			(*another->mycontext).uc_mcontext.gregs[REG_RDI]=(unsigned long)fn;//first argument
 			(*another->mycontext).uc_mcontext.gregs[REG_RSI]=(unsigned long)parg;//second argument
 			int id=0;
@@ -336,15 +345,20 @@ thread_exit(Tid tid)
  *		   destroy, i.e., this is the last thread in the system. This
  *		   can happen in response to a call with tid set to THREAD_ANY
  *		   or THREAD_SELF. */
- 	//printlist(readyQueue,current);
+ 	printlist(readyQueue,current);
+ 	printf("%s   %d\n","destroying",tid );
 	if(tid==THREAD_ANY){
 		struct thread *pt=removeFirst(readyQueue);
 		if(pt==NULL)
 			return THREAD_NONE;
 		else{
 			arr[tid]=0;
-			//void* stack=(void*)(*pt->mycontext).uc_mcontext.gregs[REG_RSP];
-			//free(stack);
+			void* stack=(void*)pt->sp_base;
+			//for the first time of thread 0,since we do not use malloc
+				//for it's stack, we have nothing to free. For other cases, we can safely
+				//free it
+			if(stack!=NULL)
+				free(stack);
 			free(pt->mycontext);
 			free(pt);
 			return tid;
@@ -355,11 +369,14 @@ thread_exit(Tid tid)
 		if(readyQueue->size==0)
 			return THREAD_NONE;
 		else{
-			thread_yield(THREAD_ANY);
 			struct thread *pt=(void*)removeById(readyQueue,tid);
+			thread_yield(THREAD_ANY);
 			arr[tid]=0;
-			//void* stack=(void*)(*pt->mycontext).uc_mcontext.gregs[REG_RSP];
-			//free(stack);
+			if(pt==NULL)
+				printf("%s\n","Im null" );
+			void* stack=(void*)(pt->sp_base);
+			if(stack!=NULL)
+				free(stack);
 			free(pt->mycontext);
 			free(pt);
 			return tid;
@@ -372,8 +389,9 @@ thread_exit(Tid tid)
 			return THREAD_INVALID;
 		else{
 			arr[tid]=0;
-			//void* stack=(void*)(*pt->mycontext).uc_mcontext.gregs[REG_RSP];
-			//free(stack);
+			void* stack=(void*)(pt->sp_base);
+			if(stack!=NULL)
+				free(stack);
 			free(pt->mycontext);
 			free(pt);
 			return tid;
