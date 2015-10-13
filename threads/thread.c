@@ -140,6 +140,7 @@ add_thread(struct list *queue, struct thread *thread)
 
 struct thread *current;
 struct list *readyQueue;
+struct list *exitedQueue;
 int *arr;//mark the # of threads, 0 for not used, 1 for used
 void
 thread_init(void)
@@ -147,13 +148,14 @@ thread_init(void)
 	/* your optional code here */
 	current=malloc(sizeof(struct thread));
 	readyQueue=malloc(sizeof(struct list));
+	exitedQueue=malloc(sizeof(struct list));
+	exitedQueue->size=0;
 	current->mycontext=malloc(sizeof(ucontext_t));
 	getcontext(current->mycontext);
 	current->id=0;
 	current->sp_base=NULL;
 	current->status=running;
 	current->next=NULL;//this field should never get used.
-	readyQueue=malloc(sizeof (struct list));
 	readyQueue->size=0;
 	arr=malloc(sizeof(int)*THREAD_MAX_THREADS);
 	int i=0;
@@ -276,11 +278,14 @@ thread_yield(Tid want_tid)
  		else {
  			int mark=0;//DO NOT WANT INFINITE LOOP BETWEEN SAVE/RECOVERY!!!!!!!!! 
  			struct thread *old=current;
- 			old->status=ready;
- 			old->next=NULL;
+ 			if(old->status==running){// if it's exited, we do not want to add it to readyqueue
+ 				old->status=ready;
+ 				old->next=NULL;
+ 				add_thread(readyQueue,old);
+ 			}
  			current=pt;
  			current->status=running;
- 			add_thread(readyQueue,old);
+ 			
  			int ret=current->id;//necessary,otherwise,when switch back,it will return the 
  			//original id
  			getcontext(old->mycontext);
@@ -302,12 +307,14 @@ thread_yield(Tid want_tid)
 		else{
 			int mark=0;//DO NOT WANT INFINITE LOOP BETWEEN SAVE/RECOVERY!!!!!!!!! 
  			struct thread *old=current;
- 			old->status=ready;
+ 			if(old->status==running){// if it's exited, we do not want to add it to readyqueue
+ 				old->status=ready;
+ 				old->next=NULL;
+ 				add_thread(readyQueue,old);
+ 			}
  			current=target;
  			current->status=running;
  			current->next=NULL;
- 			old->next=NULL;
- 			add_thread(readyQueue,old);
  			int ret=current->id;//necessary,otherwise,when switch back,it will return the 
  			//original id
  			getcontext(old->mycontext);
@@ -345,14 +352,29 @@ thread_exit(Tid tid)
  *		   destroy, i.e., this is the last thread in the system. This
  *		   can happen in response to a call with tid set to THREAD_ANY
  *		   or THREAD_SELF. */
- 	printlist(readyQueue,current);
- 	printf("%s   %d\n","destroying",tid );
+ 	//printlist(readyQueue,current);
+ 	//printf("%s   %d\n","destroying",tid );
+ 	struct thread *temp;
+ 	while(exitedQueue->size!=0){
+ 		temp=exitedQueue->head;
+ 		exitedQueue->size-=1;
+ 		exitedQueue->head=temp->next;
+ 		void* stack=(void*)temp->sp_base;
+			//for the first time of thread 0,since we do not use malloc
+				//for it's stack, we have nothing to free. For other cases, we can safely
+				//free it
+		if(stack!=NULL)
+			free(stack);
+		free(temp->mycontext);
+		free(temp);
+ 	}
 	if(tid==THREAD_ANY){
 		struct thread *pt=removeFirst(readyQueue);
 		if(pt==NULL)
 			return THREAD_NONE;
 		else{
-			arr[tid]=0;
+			arr[pt->id]=0;
+			int ret=pt->id;
 			void* stack=(void*)pt->sp_base;
 			//for the first time of thread 0,since we do not use malloc
 				//for it's stack, we have nothing to free. For other cases, we can safely
@@ -361,7 +383,7 @@ thread_exit(Tid tid)
 				free(stack);
 			free(pt->mycontext);
 			free(pt);
-			return tid;
+			return ret;
 		}
 
 	}
@@ -369,16 +391,18 @@ thread_exit(Tid tid)
 		if(readyQueue->size==0)
 			return THREAD_NONE;
 		else{
+			/*####buggy code : pt will always be null no matter where to put next line of code
 			struct thread *pt=(void*)removeById(readyQueue,tid);
 			thread_yield(THREAD_ANY);
-			arr[tid]=0;
-			if(pt==NULL)
-				printf("%s\n","Im null" );
-			void* stack=(void*)(pt->sp_base);
-			if(stack!=NULL)
-				free(stack);
-			free(pt->mycontext);
-			free(pt);
+			*/
+			current->status=exited;
+			arr[current->id]=0;
+			add_thread(exitedQueue,current);
+			/*##### buggy code, thread yield will add this thread to ready queue,which is not what 
+			we'd like
+			thread_yield(THREAD_ANY);
+			*///
+			thread_yield(THREAD_ANY);//modify thread yield
 			return tid;
 		}
 	}

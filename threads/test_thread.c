@@ -6,7 +6,7 @@
 #include "test_thread.h"
 
 #define DURATION  60000000
-#define NTHREADS       	1
+#define NTHREADS       	128
 #define LOOPS	        10
 
 static void grand_finale();
@@ -161,6 +161,7 @@ test_basic()
 	printf("destroying %d threads\n", THREAD_MAX_THREADS / 2);
 	for (ii = 0; ii < THREAD_MAX_THREADS; ii += 2) {
 		ret = thread_exit(THREAD_ANY);
+		//printf("ret==%d\n",ret);
 		assert(thread_ret_ok(ret));
 	}
 	for (ii = 0; ii < THREAD_MAX_THREADS; ii++) {
