@@ -1,8 +1,8 @@
-ECE344-Operating-Systems
+Operating-Systems
 <a href="http://www.eecg.toronto.edu/~ashvin/courses/ece344/current/">Course Website </a>
 
-# ECE344
->Lab Projects for ECE344 Operating Systems at UofT, You can use my code as reference but please do not plagiarize.
+# Operating-Systems
+>Lab Projects for Operating Systems at U of T, You can use my code as reference but please do not plagiarize.
 Through this course, I was able to grasp the lower level intricacies of operating systems and how they are designed.  
 In order to eliminate the various complexities of computer systems and dealing with hardware, the operating system has to handle all these tasks behind the scenes and provide a clean simple abstraction (user interface) for the basic computer user. This course discussed the concepts of 3 types of abstractions: virtual memory, files and processes/threads.
 
