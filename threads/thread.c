@@ -216,7 +216,7 @@ You need to setup the parameters to the first function.
 		}
 		else{
 			(*another->mycontext).uc_mcontext.gregs[REG_RIP]=(unsigned long)&thread_stub;
-			(*another->mycontext).uc_mcontext.gregs[REG_RSP]=(unsigned long)stack;
+			(*another->mycontext).uc_mcontext.gregs[REG_RSP]=(unsigned long)(stack+THREAD_MIN_STACK);
 			(*another->mycontext).uc_mcontext.gregs[REG_RDI]=(unsigned long)fn;//first argument
 			(*another->mycontext).uc_mcontext.gregs[REG_RSI]=(unsigned long)parg;//second argument
 			int id=0;
@@ -287,7 +287,7 @@ thread_yield(Tid want_tid)
  		}
  	}
  	else{
- 		struct thread *target=removeById(readyQueue,want_tid);
+ 		struct thread *target=(void*)removeById(readyQueue,want_tid);
  		if(target==NULL)
 			return THREAD_INVALID;
 		else{
@@ -336,14 +336,15 @@ thread_exit(Tid tid)
  *		   destroy, i.e., this is the last thread in the system. This
  *		   can happen in response to a call with tid set to THREAD_ANY
  *		   or THREAD_SELF. */
+ 	//printlist(readyQueue,current);
 	if(tid==THREAD_ANY){
 		struct thread *pt=removeFirst(readyQueue);
 		if(pt==NULL)
 			return THREAD_NONE;
 		else{
 			arr[tid]=0;
-			void* stack=(*pt->mycontext).uc_mcontext.gregs[REG_RSP];
-			free(stack);
+			//void* stack=(void*)(*pt->mycontext).uc_mcontext.gregs[REG_RSP];
+			//free(stack);
 			free(pt->mycontext);
 			free(pt);
 			return tid;
@@ -355,10 +356,10 @@ thread_exit(Tid tid)
 			return THREAD_NONE;
 		else{
 			thread_yield(THREAD_ANY);
-			struct thread *pt=removeById(tid);
+			struct thread *pt=(void*)removeById(readyQueue,tid);
 			arr[tid]=0;
-			void* stack=(*pt->mycontext).uc_mcontext.gregs[REG_RSP];
-			free(stack);
+			//void* stack=(void*)(*pt->mycontext).uc_mcontext.gregs[REG_RSP];
+			//free(stack);
 			free(pt->mycontext);
 			free(pt);
 			return tid;
@@ -366,20 +367,19 @@ thread_exit(Tid tid)
 	}
 
 	else{
-		struct thread *pt=removeById(tid);
+		struct thread *pt=removeById(readyQueue,tid);
 		if(pt==NULL)
 			return THREAD_INVALID;
 		else{
 			arr[tid]=0;
-			void* stack=(*pt->mycontext).uc_mcontext.gregs[REG_RSP];
-			free(stack);
+			//void* stack=(void*)(*pt->mycontext).uc_mcontext.gregs[REG_RSP];
+			//free(stack);
 			free(pt->mycontext);
 			free(pt);
 			return tid;
 		}
 
-	}
-	}
+		}
 }
 
 /*******************************************************************

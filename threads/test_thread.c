@@ -74,19 +74,23 @@ test_basic()
 	}
 	printf("my id is %d\n", thread_id());
 	for (ii = 0; ii < NTHREADS; ii++) {
-		printf("child[ii]= %d\n",child[ii] );
+		//printf("child[ii]= %d\n",child[ii] );
 		ret = thread_yield(child[ii]);
 		assert(ret == child[ii]);
 	}
 
 	/* destroy NTHREADS + 1 threads we just created */
 	printf("destroying all threads\n");
+	//printf("destroying %d\n",ret2 );
 	ret = thread_exit(ret2);
 	assert(ret == ret2);
 	for (ii = 0; ii < NTHREADS; ii++) {
+		//printf("destroying %d\n",child[ii]);
 		ret = thread_exit(child[ii]);
 		assert(ret == child[ii]);
 	}
+
+	//printf("%s\n", "here");
 
 	/* we destroyed other threads. yield so that these threads get to run
 	 * and exit. */
