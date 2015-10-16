@@ -65,7 +65,7 @@ test_basic()
 	int ii, jj;
 	Tid child[NTHREADS];
 	char msg[NTHREADS][1024];
-	printf("%s\n","before thread create\n" );
+	//printf("%s\n","before thread create\n" );
 	for (ii = 0; ii < NTHREADS; ii++) {
 		ret = snprintf(msg[ii], 1023, "hello from thread %3d", ii);
 		assert(ret > 0);
