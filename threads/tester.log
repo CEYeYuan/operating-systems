@@ -3,16 +3,16 @@ ucontext_t size = 936 bytes
 memory address of main() = 0x400a06
 memory address of the program counter (RIP) saved in mycontext = 0x400a26
 argc = 6314944
-argv = 0x7ffd421b9828
-memory address of the variable setcontext_called = 0x7ffd421b973c
-memory address of the variable err = 0x7ffd421b9738
+argv = 0x7ffdaa6cbac8
+memory address of the variable setcontext_called = 0x7ffdaa6cb9dc
+memory address of the variable err = 0x7ffdaa6cb9d8
 number of bytes pushed to the stack between setcontext_called and err = 4
-stack pointer register (RSP) stored in mycontext = 0x7ffd421b9720
-number of bytes between err and the saved stack in mycontext = -240
+stack pointer register (RSP) stored in mycontext = 0x7ffdaa6cb9c0
+number of bytes between err and the saved stack in mycontext = 24
 value of uc_stack.ss_sp = 0x0
 main: setcontext_called = 1
-interrupt is disabled = -1
-interrupt is disabled = -1
+interrupt is disabled = 0
+interrupt is disabled = 1
 starting basic test
 initial thread returns from yield(SELF)
 initial thread returns from yield(0)

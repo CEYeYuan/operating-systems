@@ -90,7 +90,7 @@ main(int argc, char **argv)
 	       (unsigned long)mycontext.uc_mcontext.gregs[REG_RSP]);
 
 	printf("number of bytes between err and the saved stack in mycontext "
-	       "= %ld\n", (unsigned long)&err-(unsigned long)mycontext.uc_mcontext.gregs[REG_RSI]);
+	       "= %ld\n", (unsigned long)&err-(unsigned long)mycontext.uc_mcontext.gregs[REG_RSP]);
 
 	/* QUESTIONS: what is the uc_stack field in mycontext? does it point
 	 * to the current stack pointer, top of the stack, bottom of the stack,
@@ -136,7 +136,7 @@ show_interrupt(void)
 	/* QUESTION: Are interrupts masked (i.e., disabled) in mycontext?
 	 * HINT: use sigismember below. */
 	printf("interrupt is disabled = %d\n",
-	       (unsigned int)-1);
+	       (unsigned int)sigismember(&(mycontext.uc_sigmask) , SIG_TYPE));
 
 	interrupts_off();
 
@@ -146,5 +146,5 @@ show_interrupt(void)
 	/* QUESTION: which fields of mycontext changed as a result of the
 	 * getcontext call above? */
 	printf("interrupt is disabled = %d\n",
-	       (unsigned int)-1);
+	       (unsigned int)sigismember(&(mycontext.uc_sigmask) , SIG_TYPE));
 }
