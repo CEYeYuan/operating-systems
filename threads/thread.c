@@ -330,6 +330,23 @@ thread_yield(Tid want_tid)
  	}
 }
 
+void exitedQueue_destroy(){
+	struct thread *temp;
+ 	while(exitedQueue->size!=0){
+ 		temp=exitedQueue->head;
+ 		exitedQueue->size-=1;
+ 		exitedQueue->head=temp->next;
+ 		void* stack=(void*)temp->sp_base;
+			//for the first time of thread 0,since we do not use malloc
+				//for it's stack, we have nothing to free. For other cases, we can safely
+				//free it
+		if(stack!=NULL)
+			free(stack);
+		free(temp->mycontext);
+		free(temp);
+ 	}
+}
+
 Tid
 thread_exit(Tid tid)
 { 
@@ -354,35 +371,17 @@ thread_exit(Tid tid)
  *		   or THREAD_SELF. */
  	//printlist(readyQueue,current);
  	//printf("%s   %d\n","destroying",tid );
- 	struct thread *temp;
- 	while(exitedQueue->size!=0){
- 		temp=exitedQueue->head;
- 		exitedQueue->size-=1;
- 		exitedQueue->head=temp->next;
- 		void* stack=(void*)temp->sp_base;
-			//for the first time of thread 0,since we do not use malloc
-				//for it's stack, we have nothing to free. For other cases, we can safely
-				//free it
-		if(stack!=NULL)
-			free(stack);
-		free(temp->mycontext);
-		free(temp);
- 	}
+ 	exitedQueue_destroy();
 	if(tid==THREAD_ANY){
 		struct thread *pt=removeFirst(readyQueue);
 		if(pt==NULL)
 			return THREAD_NONE;
 		else{
-			arr[pt->id]=0;
+			
 			int ret=pt->id;
-			void* stack=(void*)pt->sp_base;
-			//for the first time of thread 0,since we do not use malloc
-				//for it's stack, we have nothing to free. For other cases, we can safely
-				//free it
-			if(stack!=NULL)
-				free(stack);
-			free(pt->mycontext);
-			free(pt);
+			arr[pt->id]=0;
+			pt->status=exited;
+			add_thread(exitedQueue,pt);
 			return ret;
 		}
 
@@ -413,11 +412,8 @@ thread_exit(Tid tid)
 			return THREAD_INVALID;
 		else{
 			arr[tid]=0;
-			void* stack=(void*)(pt->sp_base);
-			if(stack!=NULL)
-				free(stack);
-			free(pt->mycontext);
-			free(pt);
+			pt->status=exited;
+			add_thread(exitedQueue,pt);
 			return tid;
 		}
 
