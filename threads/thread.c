@@ -346,13 +346,13 @@ thread_yield(Tid want_tid)
 
  	}
 }
-
-void exitedQueue_destroy(){
+void 
+queueDestroy(struct list *queue){
 	struct thread *temp;
- 	while(exitedQueue->size!=0){
- 		temp=exitedQueue->head;
- 		exitedQueue->size-=1;
- 		exitedQueue->head=temp->next;
+ 	while(queue->size!=0){
+ 		temp=queue->head;
+ 		queue->size-=1;
+ 		queue->head=temp->next;
  		void* stack=(void*)temp->sp_base;
 			//for the first time of thread 0,since we do not use malloc
 				//for it's stack, we have nothing to free. For other cases, we can safely
@@ -389,7 +389,7 @@ thread_exit(Tid tid)
  	//printlist(readyQueue,current);
  	//printf("%s   %d\n","destroying",tid );
  	int enabled=interrupts_set(0);
- 	exitedQueue_destroy();
+ 	queueDestroy(exitedQueue);
 	if(tid==THREAD_ANY){
 		struct thread *pt=removeFirst(readyQueue);
 		if(pt==NULL){
@@ -453,6 +453,7 @@ thread_exit(Tid tid)
 /* This is the wait queue structure */
 struct wait_queue {
 	/* ... Fill this in ... */
+	struct list *blockedQueue;
 };
 
 struct wait_queue *
@@ -461,34 +462,67 @@ wait_queue_create()
 	struct wait_queue *wq;
 
 	wq = malloc(sizeof(struct wait_queue));
+	wq->blockedQueue=malloc(sizeof(struct list));
+	wq->blockedQueue->size=0;
 	assert(wq);
-
-	TBD();
-
 	return wq;
 }
 
 void
 wait_queue_destroy(struct wait_queue *wq)
 {
-	TBD();
+	queueDestroy(wq->blockedQueue);
 	free(wq);
 }
 
 Tid
 thread_sleep(struct wait_queue *queue)
-{
-	TBD();
-	return THREAD_FAILED;
+{	
+	int enabled=interrupts_set(0);
+	if(readyQueue->size==0){
+		interrupts_set(enabled);
+		return THREAD_NONE;
+	}
+	else if(queue==NULL){
+		interrupts_set(enabled);
+		return THREAD_INVALID;
+	}
+	else{
+		current->status=blocked;
+		add_thread(queue->blockedQueue,current);
+		interrupts_set(enabled);
+		getcontext(current->mycontext);
+		int ret=thread_yield(THREAD_ANY);
+		return ret;
+	}	
 }
 
 /* when the 'all' parameter is 1, wakeup all threads waiting in the queue.
+   if all==0 wake up one thread in FIFO order
  * returns whether a thread was woken up on not. */
 int
 thread_wakeup(struct wait_queue *queue, int all)
-{
-	TBD();
-	return 0;
+{	int enabled=interrupts_set(0);
+	if(queue==NULL||queue->blockedQueue->size==0){
+		interrupts_set(enabled);
+		return 0;
+	}
+	else if(all==0){
+		thread *ready=removeFirst(queue->blockedQueue);
+		add_thread(readyQueue,ready);
+		interrupts_set(enabled);
+		return 1; 
+	}
+	else{
+		int counter=0;
+		while(queue->blockedQueue->size!=0){
+			thread *ready=removeFirst(queue->blockedQueue);
+			add_thread(readyQueue,ready);
+			counter++;
+		}
+		interrupts_set(enabled);
+		return counter;
+	}
 }
 
 struct lock {
