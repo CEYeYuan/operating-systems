@@ -146,6 +146,7 @@ void
 thread_init(void)
 {
 	/* your optional code here */
+	int enabled=interrupts_set(0);
 	current=malloc(sizeof(struct thread));
 	readyQueue=malloc(sizeof(struct list));
 	exitedQueue=malloc(sizeof(struct list));
@@ -164,6 +165,7 @@ thread_init(void)
 		i++;
 	}
 	arr[0]=1;
+	interrupts_set(enabled);
 }
 
 Tid
@@ -209,8 +211,11 @@ You need to allocate a new stack.
 You need to change the stack pointer to point to the top of the new stack.
 You need to setup the parameters to the first function.
  */
-	if(readyQueue->size+1>=THREAD_MAX_THREADS)
+	int enabled=interrupts_set(0);
+	if(readyQueue->size+1>=THREAD_MAX_THREADS){
+		interrupts_set(enabled);
 		return THREAD_NOMORE;
+	}
 	else{
 		struct thread *another=malloc(sizeof(thread));
 		another->mycontext=malloc(sizeof(ucontext_t));
@@ -219,6 +224,7 @@ You need to setup the parameters to the first function.
 		if(stack==NULL){
 			free(another->mycontext);
 			free(another);
+			interrupts_set(enabled);
 			return THREAD_NOMEMORY;
 		}
 		else{
@@ -237,6 +243,7 @@ You need to setup the parameters to the first function.
 			arr[id]=1;
 			another->id=id;
 			add_thread(readyQueue,another);
+			interrupts_set(enabled);
 			return id;
 		}
 	}
@@ -269,12 +276,17 @@ thread_yield(Tid want_tid)
  *		   THREAD_ANY. */
 	//TBD();
  //printlist(readyQueue,current);
- 	if(want_tid==THREAD_SELF||want_tid==current->id)
+ 	int enabled=interrupts_set(0);
+ 	if(want_tid==THREAD_SELF||want_tid==current->id){
+ 		interrupts_set(enabled);
  		return current->id;
+ 	}
  	else if(want_tid==THREAD_ANY){
  		struct thread *pt=removeFirst(readyQueue);
- 		if(pt==NULL)
+ 		if(pt==NULL){
+ 			interrupts_set(enabled);
  			return THREAD_NONE;
+ 		}
  		else {
  			int mark=0;//DO NOT WANT INFINITE LOOP BETWEEN SAVE/RECOVERY!!!!!!!!! 
  			struct thread *old=current;
@@ -288,10 +300,12 @@ thread_yield(Tid want_tid)
  			
  			int ret=current->id;//necessary,otherwise,when switch back,it will return the 
  			//original id
+ 			interrupts_set(enabled);
  			getcontext(old->mycontext);
  			mark++;
- 			if(mark>=2) 
+ 			if(mark>=2) {
  				return ret;
+ 			}
  			else{
  				setcontext(current->mycontext);
  				return ret;
@@ -302,8 +316,10 @@ thread_yield(Tid want_tid)
  	}
  	else{
  		struct thread *target=(void*)removeById(readyQueue,want_tid);
- 		if(target==NULL)
+ 		if(target==NULL){
+ 			interrupts_set(enabled);
 			return THREAD_INVALID;
+ 		}
 		else{
 			int mark=0;//DO NOT WANT INFINITE LOOP BETWEEN SAVE/RECOVERY!!!!!!!!! 
  			struct thread *old=current;
@@ -317,6 +333,7 @@ thread_yield(Tid want_tid)
  			current->next=NULL;
  			int ret=current->id;//necessary,otherwise,when switch back,it will return the 
  			//original id
+ 			interrupts_set(enabled);
  			getcontext(old->mycontext);
  			mark++;
  			if(mark>=2) 
@@ -371,24 +388,29 @@ thread_exit(Tid tid)
  *		   or THREAD_SELF. */
  	//printlist(readyQueue,current);
  	//printf("%s   %d\n","destroying",tid );
+ 	int enabled=interrupts_set(0);
  	exitedQueue_destroy();
 	if(tid==THREAD_ANY){
 		struct thread *pt=removeFirst(readyQueue);
-		if(pt==NULL)
+		if(pt==NULL){
+			interrupts_set(enabled);
 			return THREAD_NONE;
-		else{
-			
+		}
+		else{	
 			int ret=pt->id;
 			arr[pt->id]=0;
 			pt->status=exited;
 			add_thread(exitedQueue,pt);
+			interrupts_set(enabled);
 			return ret;
 		}
 
 	}
 	else if(tid==THREAD_SELF||tid==current->id){
-		if(readyQueue->size==0)
+		if(readyQueue->size==0){
+			interrupts_set(enabled);
 			return THREAD_NONE;
+		}
 		else{
 			/*####buggy code : pt will always be null no matter where to put next line of code
 			struct thread *pt=(void*)removeById(readyQueue,tid);
@@ -401,6 +423,7 @@ thread_exit(Tid tid)
 			we'd like
 			thread_yield(THREAD_ANY);
 			*///
+			interrupts_set(enabled);
 			thread_yield(THREAD_ANY);//modify thread yield
 			return tid;
 		}
@@ -408,12 +431,15 @@ thread_exit(Tid tid)
 
 	else{
 		struct thread *pt=removeById(readyQueue,tid);
-		if(pt==NULL)
+		if(pt==NULL){
+			interrupts_set(enabled);
 			return THREAD_INVALID;
+		}
 		else{
 			arr[tid]=0;
 			pt->status=exited;
 			add_thread(exitedQueue,pt);
+			interrupts_set(enabled);
 			return tid;
 		}
 
