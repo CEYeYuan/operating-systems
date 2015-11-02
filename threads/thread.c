@@ -549,7 +549,7 @@ thread_wakeup(struct wait_queue *queue, int all)
 
 struct lock {
 	/* ... Fill this in ... */
-	int isLokced;
+	int isLocked;
 	int owner;
 	//0 for unlock ;1 for locked
 	struct wait_queue *wq;
@@ -557,13 +557,14 @@ struct lock {
 
 struct lock *
 lock_create()
-{
+{	int enabled=interrupts_set(0);
 	struct lock *lock;
 	lock = malloc(sizeof(struct lock));
-	lock->isLokced=0;
+	lock->isLocked=0;
 	lock->owner=-1;
 	lock->wq=wait_queue_create();
 	assert(lock);
+	interrupts_set(enabled);
 	return lock;
 }
 
@@ -573,11 +574,12 @@ lock_destroy(struct lock *lock)
 /* destroy the lock. be sure to check that the lock is available when it is
  * being destroyed. */
 	assert(lock != NULL);
-	if(lock->isLokced==0){
-		wait_queue_destroy(lock->wq);
+	int enabled=interrupts_set(0);
+	if(lock->isLocked==0&&lock->wq==NULL){
+		//wait_queue_destroy(lock->wq);
 		free(lock);
 	}
-	
+	interrupts_set(enabled);
 }
 
 void
@@ -587,15 +589,19 @@ lock_acquire(struct lock *lock)
  * lock. */
 	assert(lock != NULL);
 	int enabled=interrupts_set(0);
-	if(lock->isLokced==1&&lock->owner!=current->id){
+	if(lock->owner==current->id){
 		interrupts_set(enabled);
+		return;
+	}
+	while(lock->isLocked==1&&lock->owner!=current->id){
+		//interrupts_set(enabled);
+		assert(!interrupts_enabled());
 		thread_sleep(lock->wq);
 	}
-	else{
-		interrupts_set(enabled);
-		lock->isLokced=1;
-		lock->owner=current->id;
-	}
+	lock->isLocked=1;
+	lock->owner=current->id;
+	interrupts_set(enabled);
+	
 }
 
 void
@@ -606,11 +612,14 @@ lock_release(struct lock *lock)
  * acquire the lock. */
 	assert(lock != NULL);
 	int enabled=interrupts_set(0);
-	if(lock->isLokced==1&&lock->owner==current->id){
-		interrupts_set(enabled);
+
+	if(lock->isLocked==1&&lock->owner==current->id){
+		lock->isLocked=0;
+		lock->owner=-1;
 		thread_wakeup(lock->wq,1);
+		interrupts_set(enabled);
 	}
-	
+	interrupts_set(enabled);
 }
 
 struct cv {
