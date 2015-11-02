@@ -3,11 +3,11 @@ ucontext_t size = 936 bytes
 memory address of main() = 0x400a06
 memory address of the program counter (RIP) saved in mycontext = 0x400a26
 argc = 6314944
-argv = 0x7fff2f235258
-memory address of the variable setcontext_called = 0x7fff2f23516c
-memory address of the variable err = 0x7fff2f235168
+argv = 0x7ffea34f0b68
+memory address of the variable setcontext_called = 0x7ffea34f0a7c
+memory address of the variable err = 0x7ffea34f0a78
 number of bytes pushed to the stack between setcontext_called and err = 4
-stack pointer register (RSP) stored in mycontext = 0x7fff2f235150
+stack pointer register (RSP) stored in mycontext = 0x7ffea34f0a60
 number of bytes between err and the saved stack in mycontext = 24
 value of uc_stack.ss_sp = 0x0
 main: setcontext_called = 1
@@ -419,3 +419,52 @@ for my grand finale, I will destroy myself
 while my talented assistant prints "basic test done"
 finale running
 basic test done
+starting preemptive test
+this test will take 60 seconds
+interrupt_handler: context at 0x7ffe8f0abe00, time diff = 0 us
+interrupt_handler: context at 0x7ffe8f0abdc0, time diff = 217 us
+interrupt_handler: context at 0x7ffe8f0abe00, time diff = 217 us
+interrupt_handler: context at 0x7ffe8f0abdc0, time diff = 215 us
+0: thread   0 made it to do_potato
+starting preemptive test
+this test will take 60 seconds
+interrupt_handler: context at 0x7ffe090eeb00, time diff = 0 us
+interrupt_handler: context at 0x7ffe090eeb40, time diff = 209 us
+interrupt_handler: context at 0x7ffe090eeb40, time diff = 204 us
+interrupt_handler: context at 0x7ffe090eeb00, time diff = 203 us
+interrupt_handler: context at 0x7ffe090eeb00, time diff = 204 us
+0: thread   0 made it to do_potato
+starting preemptive test
+this test will take 60 seconds
+interrupt_handler: context at 0x7ffefc03b040, time diff = 0 us
+interrupt_handler: context at 0x7ffefc03b040, time diff = 206 us
+interrupt_handler: context at 0x7ffefc03b040, time diff = 203 us
+interrupt_handler: context at 0x7ffefc03b040, time diff = 203 us
+interrupt_handler: context at 0x7ffefc03b080, time diff = 203 us
+0: thread   0 made it to do_potato
+starting preemptive test
+this test will take 60 seconds
+interrupt_handler: context at 0x7ffd01333000, time diff = 0 us
+interrupt_handler: context at 0x7ffd01333040, time diff = 210 us
+interrupt_handler: context at 0x7ffd01333040, time diff = 209 us
+interrupt_handler: context at 0x7ffd01333000, time diff = 208 us
+0: thread   0 made it to do_potato
+test_preemptive: test_thread.c:356: try_move_potato: Assertion `interrupts_enabled()' failed.
+starting preemptive test
+this test will take 60 seconds
+interrupt_handler: context at 0x7fff91828e40, time diff = 0 us
+interrupt_handler: context at 0x7fff91828e80, time diff = 205 us
+interrupt_handler: context at 0x7fff91828e40, time diff = 204 us
+interrupt_handler: context at 0x7fff91828e40, time diff = 203 us
+interrupt_handler: context at 0x7fff91828e40, time diff = 203 us
+0: thread   0 made it to do_potato
+test_preemptive: test_thread.c:356: try_move_potato: Assertion `interrupts_enabled()' failed.
+starting preemptive test
+this test will take 60 seconds
+interrupt_handler: context at 0x7ffc692fc540, time diff = 0 us
+interrupt_handler: context at 0x7ffc692fc540, time diff = 206 us
+interrupt_handler: context at 0x7ffc692fc540, time diff = 203 us
+interrupt_handler: context at 0x7ffc692fc540, time diff = 204 us
+interrupt_handler: context at 0x7ffc692fc540, time diff = 203 us
+0: thread   0 made it to do_potato
+test_preemptive: test_thread.c:356: try_move_potato: Assertion `interrupts_enabled()' failed.
