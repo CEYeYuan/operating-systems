@@ -306,7 +306,7 @@ thread_yield(Tid want_tid)
  			getcontext(old->mycontext);
  			mark++;
  			if(mark>=2) {
- 			interrupts_set(enabled);
+ 				interrupts_set(enabled);
  				return ret;
  			}
  			else{
@@ -514,7 +514,7 @@ thread_sleep(struct wait_queue *queue)
 			ret=thread_yield(THREAD_ANY);
 			return ret;
 		}	
-}
+	}
 }
 
 /* when the 'all' parameter is 1, wakeup all threads waiting in the queue.
@@ -551,7 +551,7 @@ thread_wakeup(struct wait_queue *queue, int all)
 
 struct lock {
 	/* ... Fill this in ... */
-	int isLokced;
+	int isLocked;
 	int owner;
 	//0 for unlock ;1 for locked
 	struct wait_queue *wq;
@@ -562,7 +562,7 @@ lock_create()
 {
 	struct lock *lock;
 	lock = malloc(sizeof(struct lock));
-	lock->isLokced=0;
+	lock->isLocked=0;
 	lock->owner=-1;
 	lock->wq=wait_queue_create();
 	assert(lock);
@@ -575,7 +575,7 @@ lock_destroy(struct lock *lock)
 /* destroy the lock. be sure to check that the lock is available when it is
  * being destroyed. */
 	assert(lock != NULL);
-	if(lock->isLokced==0){
+	if(lock->isLocked==0){
 		wait_queue_destroy(lock->wq);
 		free(lock);
 	}
@@ -589,14 +589,13 @@ lock_acquire(struct lock *lock)
  * lock. */
 	assert(lock != NULL);
 	int enabled=interrupts_set(0);
-	while(lock->isLokced==1&&lock->owner!=current->id){
+	while(lock->isLocked==1&&lock->owner!=current->id){
 		interrupts_set(enabled);
 		thread_sleep(lock->wq);
 	}
-	
-		lock->isLokced=1;
-		lock->owner=current->id;
-		interrupts_set(enabled);
+	lock->isLocked=1;
+	lock->owner=current->id;
+	interrupts_set(enabled);
 }
 
 void
@@ -607,9 +606,9 @@ lock_release(struct lock *lock)
  * acquire the lock. */
 	assert(lock != NULL);
 	int enabled=interrupts_set(0);
-	if(lock->isLokced==1&&lock->owner==current->id){
-		lock->isLokced=0;
-		lock->owner=current->id;
+	if(lock->isLocked==1&&lock->owner==current->id){
+		lock->isLocked=0;
+		lock->owner=-1;
 		interrupts_set(enabled);
 		thread_wakeup(lock->wq,1);
 	}
@@ -626,22 +625,19 @@ struct cv {
 struct cv *
 cv_create()
 {	
-	int enabled=interrupts_set(0);
 	struct cv *cv;
 	cv = malloc(sizeof(struct cv));
 	cv->wq=wait_queue_create();
 	assert(cv);
-	interrupts_set(enabled);
 	return cv;
 }
 
 void
 cv_destroy(struct cv *cv)
-{	int enabled=interrupts_set(0);
+{	
 	assert(cv != NULL);
 	wait_queue_destroy(cv->wq);
 	free(cv);
-	interrupts_set(enabled);
 }
 
 void
@@ -651,14 +647,24 @@ cv_wait(struct cv *cv, struct lock *lock)
  * that the calling thread had acquired lock when this call is made. you will
  * need to release the lock before waiting, and reacquire it before returning
  * from wait. */
+ /* Why do we need wait? when we enter the critical section, we want to get 
+ some resourses other than the lock, but it's not available right now, so we'd
+ better let other thread runs first, and when they're done, they'll call wakeup,
+ then this thread should be moved from blocked queue to ready queue again. Release
+ the lock and sleep should be done atomicaaly. else(sleep while holding a lock,
+ no one can run(producer-consumer problem). or release lock first, then wakeup might 
+ be lost). When the thread gets to run next,it should be still in the critical section*/
 	assert(cv != NULL);
 	assert(lock != NULL);
-	int enabled=interrupts_set(0);//disable the preemptive scheduling
-	//check if the condition is true
-	lock_release(lock);
-	thread_sleep(cv->wq);
-	lock_acquire(lock);
-	interrupts_set(enabled);
+	if(lock->owner==current->id){
+		lock_release(lock);
+		thread_sleep(cv->wq);
+		//release thr lock and sleep atomically
+		//when this  thread will run again? some one wakes it up and
+		//scheduler choose to run it.If it's in the critical section
+		//it should still hold the lock after the wait return.
+		lock_acquire(lock);
+	}
 }
 
 void
@@ -669,10 +675,9 @@ cv_signal(struct cv *cv, struct lock *lock)
  * check that the calling thread had acquired lock when this call is made. */
 	assert(cv != NULL);
 	assert(lock != NULL);
-	int enabled=interrupts_set(0);
 	if(lock->owner==current->id)
 		thread_wakeup(cv->wq,0);
-	interrupts_set(enabled);
+	
 }	
 
 void
@@ -682,8 +687,6 @@ cv_broadcast(struct cv *cv, struct lock *lock)
  * check that the calling thread had acquired lock when this call is made. */
 	assert(cv != NULL);
 	assert(lock != NULL);
-	int enabled=interrupts_set(0);
 	if(lock->owner==current->id)
 		thread_wakeup(cv->wq,1);
-	interrupts_set(enabled);
 }
