@@ -37,13 +37,13 @@ void
 thread_stub(void (*thread_main)(void *), void *arg)
 {
 	Tid ret;
-	interrupts_set(1);
+	int enabled=interrupts_set(1);
 	/* when create a new thread, i.e. call tread_main() function, we need to make
 	sure interrupt is on, because somehow we need to call set_context or more precisely,
 	we need to switch the register
 	*/
 	thread_main(arg); // call thread_main() function with arg
-	//interrupts_set(enabled);
+	interrupts_set(enabled);
 	ret = thread_exit(THREAD_SELF);
 	// we should only get here if we are the last thread. 
 	assert(ret == THREAD_NONE);
@@ -653,7 +653,8 @@ cv_wait(struct cv *cv, struct lock *lock)
  * from wait. */
 	assert(cv != NULL);
 	assert(lock != NULL);
-	int enabled=interrupts_set(0);
+	int enabled=interrupts_set(0);//disable the preemptive scheduling
+	//check if the condition is true
 	lock_release(lock);
 	thread_sleep(cv->wq);
 	lock_acquire(lock);
@@ -669,10 +670,10 @@ cv_signal(struct cv *cv, struct lock *lock)
 	assert(cv != NULL);
 	assert(lock != NULL);
 	int enabled=interrupts_set(0);
-	lock_acquire(lock);
-	thread_wakeup(cv->wq,0);
+	if(lock->owner==current->id)
+		thread_wakeup(cv->wq,0);
 	interrupts_set(enabled);
-}
+}	
 
 void
 cv_broadcast(struct cv *cv, struct lock *lock)
@@ -682,7 +683,7 @@ cv_broadcast(struct cv *cv, struct lock *lock)
 	assert(cv != NULL);
 	assert(lock != NULL);
 	int enabled=interrupts_set(0);
-	lock_acquire(lock);
-	thread_wakeup(cv->wq,1);
+	if(lock->owner==current->id)
+		thread_wakeup(cv->wq,1);
 	interrupts_set(enabled);
 }
