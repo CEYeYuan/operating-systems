@@ -229,7 +229,7 @@ You need to setup the parameters to the first function.
 		}
 		else{
 			(*another->mycontext).uc_mcontext.gregs[REG_RIP]=(unsigned long)&thread_stub;
-			(*another->mycontext).uc_mcontext.gregs[REG_RSP]=(unsigned long)(stack+THREAD_MIN_STACK);
+			(*another->mycontext).uc_mcontext.gregs[REG_RSP]=(unsigned long)(stack+THREAD_MIN_STACK+8);
 			//should store the highest address; but both malloc and free should use the lowest address
 			another->sp_base=stack;
 			//why do we need another member in the thread? becasue the register value for RSP will
