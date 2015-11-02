@@ -37,8 +37,13 @@ void
 thread_stub(void (*thread_main)(void *), void *arg)
 {
 	Tid ret;
-
+	int enabled=interrupts_set(1);
+	/* when create a new thread, i.e. call tread_main() function, we need to make
+	sure interrupt is on, because somehow we need to call set_context or more precisely,
+	we need to switch the register
+	*/
 	thread_main(arg); // call thread_main() function with arg
+	interrupts_set(enabled);
 	ret = thread_exit(THREAD_SELF);
 	// we should only get here if we are the last thread. 
 	assert(ret == THREAD_NONE);
@@ -479,13 +484,13 @@ Tid
 thread_sleep(struct wait_queue *queue)
 {	
 	int enabled=interrupts_set(0);
-	if(readyQueue->size==0){
-		interrupts_set(enabled);
-		return THREAD_NONE;
-	}
-	else if(queue==NULL){
+	if(queue==NULL){
 		interrupts_set(enabled);
 		return THREAD_INVALID;
+	}
+	else if(readyQueue->size==0){
+		interrupts_set(enabled);
+		return THREAD_NONE;
 	}
 	else{
 		current->status=blocked;
