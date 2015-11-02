@@ -491,7 +491,7 @@ thread_sleep(struct wait_queue *queue)
 		current->status=blocked;
 		add_thread(queue->blockedQueue,current);
 		int counter=0;
-		int ret;
+		int ret=0;
 		interrupts_set(enabled);
 		/*why do we need to check how many times even if we disable the interrupt?
 		if not, after being woken up and chosen to run again, the first instruction to
