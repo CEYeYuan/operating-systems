@@ -589,15 +589,14 @@ lock_acquire(struct lock *lock)
  * lock. */
 	assert(lock != NULL);
 	int enabled=interrupts_set(0);
-	if(lock->isLokced==1&&lock->owner!=current->id){
+	while(lock->isLokced==1&&lock->owner!=current->id){
 		interrupts_set(enabled);
 		thread_sleep(lock->wq);
 	}
-	else{
-		interrupts_set(enabled);
+	
 		lock->isLokced=1;
 		lock->owner=current->id;
-	}
+		interrupts_set(enabled);
 }
 
 void
@@ -609,9 +608,12 @@ lock_release(struct lock *lock)
 	assert(lock != NULL);
 	int enabled=interrupts_set(0);
 	if(lock->isLokced==1&&lock->owner==current->id){
+		lock->isLokced=0;
+		lock->owner=current->id;
 		interrupts_set(enabled);
 		thread_wakeup(lock->wq,1);
 	}
+	interrupts_set(enabled);
 	
 }
 
