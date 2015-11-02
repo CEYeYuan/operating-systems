@@ -490,11 +490,24 @@ thread_sleep(struct wait_queue *queue)
 	else{
 		current->status=blocked;
 		add_thread(queue->blockedQueue,current);
+		int counter=0;
+		int ret;
 		interrupts_set(enabled);
+		/*why do we need to check how many times even if we disable the interrupt?
+		if not, after being woken up and chosen to run again, the first instruction to
+		run would be yield. So the original thread can not even finish the thread_sleep	
+		function.
+		*/
 		getcontext(current->mycontext);
-		int ret=thread_yield(THREAD_ANY);
-		return ret;
-	}	
+		counter++;
+		if(counter>=2){
+			return ret;
+		}
+		else{
+			ret=thread_yield(THREAD_ANY);
+			return ret;
+		}	
+}
 }
 
 /* when the 'all' parameter is 1, wakeup all threads waiting in the queue.
