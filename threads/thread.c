@@ -38,10 +38,9 @@ thread_stub(void (*thread_main)(void *), void *arg)
 {
 	Tid ret;
 	int enabled=interrupts_set(1);
-	/* when create a new thread, i.e. call tread_main() function, we need to make
-	sure interrupt is on, because somehow we need to call set_context or more precisely,
-	we need to switch the register
-	*/
+	/*when the new thread starts running, since it's not in critical section,
+	 there is no need to disable the interrupt, but inside thread_yield*/
+
 	thread_main(arg); // call thread_main() function with arg
 	interrupts_set(enabled);
 	ret = thread_exit(THREAD_SELF);
@@ -300,12 +299,16 @@ thread_yield(Tid want_tid)
  			}
  			current=pt;
  			current->status=running;
- 			
  			int ret=current->id;//necessary,otherwise,when switch back,it will return the 
  			//original id
  			getcontext(old->mycontext);
  			mark++;
  			if(mark>=2) {
+ 				/*for the ordinary thread, when switch back, before thread yield returns,
+ 				it will enable the interrupt, so there're no problem
+				BUT FOR a new thread,when we call set thread, we'd run stub function with
+				interrupt disabled, which is a issue
+ 				*/
  				interrupts_set(enabled);
  				return ret;
  			}
