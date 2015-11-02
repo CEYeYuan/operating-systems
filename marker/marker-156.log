@@ -11,14 +11,4 @@ cc -g -Wall -Werror -D_GNU_SOURCE    test_wakeup_all.c test_thread.o thread.o in
 cc -g -Wall -Werror -D_GNU_SOURCE    test_lock.c test_thread.o thread.o interrupt.o   -o test_lock
 cc -g -Wall -Werror -D_GNU_SOURCE    test_cv_signal.c test_thread.o thread.o interrupt.o   -o test_cv_signal
 cc -g -Wall -Werror -D_GNU_SOURCE    test_cv_broadcast.c test_thread.o thread.o interrupt.o   -o test_cv_broadcast
-Running: /cad2/ece344f/tester/scripts/lab2-01-ucontext.py 
-ucontext test
-Mark for ucontext test is 10 out of 10
-PASS
-
-Running: /cad2/ece344f/tester/scripts/lab2-02-basic.py 
-basic test
-Mark for basic test is 40 out of 40
-PASS
-
-You have received 50 marks out of a total of 50 marks.
+Running: /cad2/ece344f/tester/scripts/lab3-01-preemptive.py 

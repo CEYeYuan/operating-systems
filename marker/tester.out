@@ -1,2 +1,6 @@
-ucontext test, 0, 10
-basic test, 0, 40
+preemptive test, 0, 20
+wakeup test, 0, 10
+wakeup all test, 0, 6
+lock test, 0, 12
+cv signal test, 0, 12
+cv broadcast test, 0, 12

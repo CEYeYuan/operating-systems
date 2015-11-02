@@ -37,8 +37,12 @@ void
 thread_stub(void (*thread_main)(void *), void *arg)
 {
 	Tid ret;
+	int enabled=interrupts_set(1);
+	/*when the new thread starts running, since it's not in critical section,
+	 there is no need to disable the interrupt, but inside thread_yield*/
 
 	thread_main(arg); // call thread_main() function with arg
+	interrupts_set(enabled);
 	ret = thread_exit(THREAD_SELF);
 	// we should only get here if we are the last thread. 
 	assert(ret == THREAD_NONE);
@@ -146,6 +150,7 @@ void
 thread_init(void)
 {
 	/* your optional code here */
+	int enabled=interrupts_set(0);
 	current=malloc(sizeof(struct thread));
 	readyQueue=malloc(sizeof(struct list));
 	exitedQueue=malloc(sizeof(struct list));
@@ -164,6 +169,7 @@ thread_init(void)
 		i++;
 	}
 	arr[0]=1;
+	interrupts_set(enabled);
 }
 
 Tid
@@ -194,14 +200,12 @@ thread_create(void (*fn) (void *), void *parg)
  * THREAD_NOMORE: no more threads can be created.
  * THREAD_NOMEMORY: no more memory available to create a thread stack. 
  
-
  to create a new thread, you will use getcontext to create a valid context,
  but you will leave the current thread running; you (the current thread, actually) 
  will then change a few registers in this valid context to initialize it as a new thread, 
  and put this new thread into the ready queue; finally, at some point, the new thread will
  be chosen by the scheduler, and it will run when setcontext is called on this new 
  thread's context.
-
 when creating a thread, you can't just make a copy of the current thread's context (using getcontext).
 You need to make a copy and then change four things:
 You need to change the program counter to point to the first function that the thread should run.
@@ -209,8 +213,11 @@ You need to allocate a new stack.
 You need to change the stack pointer to point to the top of the new stack.
 You need to setup the parameters to the first function.
  */
-	if(readyQueue->size+1>=THREAD_MAX_THREADS)
+	int enabled=interrupts_set(0);
+	if(readyQueue->size+1>=THREAD_MAX_THREADS){
+		interrupts_set(enabled);
 		return THREAD_NOMORE;
+	}
 	else{
 		struct thread *another=malloc(sizeof(thread));
 		another->mycontext=malloc(sizeof(ucontext_t));
@@ -219,11 +226,12 @@ You need to setup the parameters to the first function.
 		if(stack==NULL){
 			free(another->mycontext);
 			free(another);
+			interrupts_set(enabled);
 			return THREAD_NOMEMORY;
 		}
 		else{
 			(*another->mycontext).uc_mcontext.gregs[REG_RIP]=(unsigned long)&thread_stub;
-			(*another->mycontext).uc_mcontext.gregs[REG_RSP]=(unsigned long)(stack+THREAD_MIN_STACK);
+			(*another->mycontext).uc_mcontext.gregs[REG_RSP]=(unsigned long)(stack+THREAD_MIN_STACK+8);
 			//should store the highest address; but both malloc and free should use the lowest address
 			another->sp_base=stack;
 			//why do we need another member in the thread? becasue the register value for RSP will
@@ -237,6 +245,7 @@ You need to setup the parameters to the first function.
 			arr[id]=1;
 			another->id=id;
 			add_thread(readyQueue,another);
+			interrupts_set(enabled);
 			return id;
 		}
 	}
@@ -269,12 +278,17 @@ thread_yield(Tid want_tid)
  *		   THREAD_ANY. */
 	//TBD();
  //printlist(readyQueue,current);
- 	if(want_tid==THREAD_SELF||want_tid==current->id)
+ 	int enabled=interrupts_set(0);
+ 	if(want_tid==THREAD_SELF||want_tid==current->id){
+ 		interrupts_set(enabled);
  		return current->id;
+ 	}
  	else if(want_tid==THREAD_ANY){
  		struct thread *pt=removeFirst(readyQueue);
- 		if(pt==NULL)
+ 		if(pt==NULL){
+ 			interrupts_set(enabled);
  			return THREAD_NONE;
+ 		}
  		else {
  			int mark=0;//DO NOT WANT INFINITE LOOP BETWEEN SAVE/RECOVERY!!!!!!!!! 
  			struct thread *old=current;
@@ -285,15 +299,22 @@ thread_yield(Tid want_tid)
  			}
  			current=pt;
  			current->status=running;
- 			
  			int ret=current->id;//necessary,otherwise,when switch back,it will return the 
  			//original id
  			getcontext(old->mycontext);
  			mark++;
- 			if(mark>=2) 
+ 			if(mark>=2) {
+ 				/*for the ordinary thread, when switch back, before thread yield returns,
+ 				it will enable the interrupt, so there're no problem
+				BUT FOR a new thread,when we call set thread, we'd run stub function with
+				interrupt disabled, which is a issue
+ 				*/
+ 				interrupts_set(enabled);
  				return ret;
+ 			}
  			else{
  				setcontext(current->mycontext);
+ 				interrupts_set(enabled);
  				return ret;
  			}
  			//when switch back, current is still the running thread, so it won't 
@@ -302,8 +323,10 @@ thread_yield(Tid want_tid)
  	}
  	else{
  		struct thread *target=(void*)removeById(readyQueue,want_tid);
- 		if(target==NULL)
+ 		if(target==NULL){
+ 			interrupts_set(enabled);
 			return THREAD_INVALID;
+ 		}
 		else{
 			int mark=0;//DO NOT WANT INFINITE LOOP BETWEEN SAVE/RECOVERY!!!!!!!!! 
  			struct thread *old=current;
@@ -319,14 +342,34 @@ thread_yield(Tid want_tid)
  			//original id
  			getcontext(old->mycontext);
  			mark++;
- 			if(mark>=2) 
+ 			if(mark>=2) {
+ 				interrupts_set(enabled);
  				return ret;
+ 				}
  			else{
  				setcontext(current->mycontext);
+ 				interrupts_set(enabled);
  				return ret;
  			}
 		}
 
+ 	}
+}
+void 
+queueDestroy(struct list *queue){
+	struct thread *temp;
+ 	while(queue->size!=0){
+ 		temp=queue->head;
+ 		queue->size-=1;
+ 		queue->head=temp->next;
+ 		void* stack=(void*)temp->sp_base;
+			//for the first time of thread 0,since we do not use malloc
+				//for it's stack, we have nothing to free. For other cases, we can safely
+				//free it
+		if(stack!=NULL)
+			free(stack);
+		free(temp->mycontext);
+		free(temp);
  	}
 }
 
@@ -354,42 +397,29 @@ thread_exit(Tid tid)
  *		   or THREAD_SELF. */
  	//printlist(readyQueue,current);
  	//printf("%s   %d\n","destroying",tid );
- 	struct thread *temp;
- 	while(exitedQueue->size!=0){
- 		temp=exitedQueue->head;
- 		exitedQueue->size-=1;
- 		exitedQueue->head=temp->next;
- 		void* stack=(void*)temp->sp_base;
-			//for the first time of thread 0,since we do not use malloc
-				//for it's stack, we have nothing to free. For other cases, we can safely
-				//free it
-		if(stack!=NULL)
-			free(stack);
-		free(temp->mycontext);
-		free(temp);
- 	}
+ 	int enabled=interrupts_set(0);
+ 	queueDestroy(exitedQueue);
 	if(tid==THREAD_ANY){
 		struct thread *pt=removeFirst(readyQueue);
-		if(pt==NULL)
+		if(pt==NULL){
+			interrupts_set(enabled);
 			return THREAD_NONE;
-		else{
-			arr[pt->id]=0;
+		}
+		else{	
 			int ret=pt->id;
-			void* stack=(void*)pt->sp_base;
-			//for the first time of thread 0,since we do not use malloc
-				//for it's stack, we have nothing to free. For other cases, we can safely
-				//free it
-			if(stack!=NULL)
-				free(stack);
-			free(pt->mycontext);
-			free(pt);
+			arr[pt->id]=0;
+			pt->status=exited;
+			add_thread(exitedQueue,pt);
+			interrupts_set(enabled);
 			return ret;
 		}
 
 	}
 	else if(tid==THREAD_SELF||tid==current->id){
-		if(readyQueue->size==0)
+		if(readyQueue->size==0){
+			interrupts_set(enabled);
 			return THREAD_NONE;
+		}
 		else{
 			/*####buggy code : pt will always be null no matter where to put next line of code
 			struct thread *pt=(void*)removeById(readyQueue,tid);
@@ -402,22 +432,24 @@ thread_exit(Tid tid)
 			we'd like
 			thread_yield(THREAD_ANY);
 			*///
+			
 			thread_yield(THREAD_ANY);//modify thread yield
+			interrupts_set(enabled);
 			return tid;
 		}
 	}
 
 	else{
 		struct thread *pt=removeById(readyQueue,tid);
-		if(pt==NULL)
+		if(pt==NULL){
+			interrupts_set(enabled);
 			return THREAD_INVALID;
+		}
 		else{
 			arr[tid]=0;
-			void* stack=(void*)(pt->sp_base);
-			if(stack!=NULL)
-				free(stack);
-			free(pt->mycontext);
-			free(pt);
+			pt->status=exited;
+			add_thread(exitedQueue,pt);
+			interrupts_set(enabled);
 			return tid;
 		}
 
@@ -431,6 +463,7 @@ thread_exit(Tid tid)
 /* This is the wait queue structure */
 struct wait_queue {
 	/* ... Fill this in ... */
+	struct list *blockedQueue;
 };
 
 struct wait_queue *
@@ -439,129 +472,224 @@ wait_queue_create()
 	struct wait_queue *wq;
 
 	wq = malloc(sizeof(struct wait_queue));
+	wq->blockedQueue=malloc(sizeof(struct list));
+	wq->blockedQueue->size=0;
 	assert(wq);
-
-	TBD();
-
 	return wq;
 }
 
 void
 wait_queue_destroy(struct wait_queue *wq)
 {
-	TBD();
+	queueDestroy(wq->blockedQueue);
 	free(wq);
 }
 
 Tid
 thread_sleep(struct wait_queue *queue)
-{
-	TBD();
-	return THREAD_FAILED;
+{	
+	int enabled=interrupts_set(0);
+	if(queue==NULL){
+		interrupts_set(enabled);
+		return THREAD_INVALID;
+	}
+	else if(readyQueue->size==0){
+		interrupts_set(enabled);
+		return THREAD_NONE;
+	}
+	else{
+		current->status=blocked;
+		add_thread(queue->blockedQueue,current);
+		int counter=0;
+		int ret=0;
+		interrupts_set(enabled);
+		/*why do we need to check how many times even if we disable the interrupt?
+		if not, after being woken up and chosen to run again, the first instruction to
+		run would be yield. So the original thread can not even finish the thread_sleep	
+		function.
+		*/
+		getcontext(current->mycontext);
+		counter++;
+		if(counter>=2){
+			return ret;
+		}
+		else{
+			ret=thread_yield(THREAD_ANY);
+			return ret;
+		}	
+	}
 }
 
 /* when the 'all' parameter is 1, wakeup all threads waiting in the queue.
+   if all==0 wake up one thread in FIFO order
  * returns whether a thread was woken up on not. */
 int
 thread_wakeup(struct wait_queue *queue, int all)
-{
-	TBD();
-	return 0;
+{	int enabled=interrupts_set(0);
+	if(queue==NULL||queue->blockedQueue->size==0){
+		interrupts_set(enabled);
+		return 0;
+	}
+	else if(all==0){
+		thread *ready=removeFirst(queue->blockedQueue);
+		add_thread(readyQueue,ready);
+		interrupts_set(enabled);
+		return 1; 
+	}
+	else{
+		int counter=0;
+		while(queue->blockedQueue->size!=0){
+			thread *ready=removeFirst(queue->blockedQueue);
+			add_thread(readyQueue,ready);
+			counter++;
+		}
+		interrupts_set(enabled);
+		return counter;
+	}
 }
+
+/* create a blocking lock. initially, the lock is available. associate a wait
+ * queue with the lock so that threads that need to acquire the lock can wait in
+ * this queue. */ 
 
 struct lock {
 	/* ... Fill this in ... */
+	int isLocked;
+	int owner;
+	//0 for unlock ;1 for locked
+	struct wait_queue *wq;
 };
 
 struct lock *
 lock_create()
 {
 	struct lock *lock;
-
 	lock = malloc(sizeof(struct lock));
+	lock->isLocked=0;
+	lock->owner=-1;
+	lock->wq=wait_queue_create();
 	assert(lock);
-
-	TBD();
-
 	return lock;
 }
 
 void
 lock_destroy(struct lock *lock)
 {
+/* destroy the lock. be sure to check that the lock is available when it is
+ * being destroyed. */
 	assert(lock != NULL);
-
-	TBD();
-
-	free(lock);
+	if(lock->isLocked==0){
+		wait_queue_destroy(lock->wq);
+		free(lock);
+	}
+	
 }
 
 void
 lock_acquire(struct lock *lock)
 {
+/* acquire the lock. threads should be suspended until they can acquire the
+ * lock. */
 	assert(lock != NULL);
-
-	TBD();
+	int enabled=interrupts_set(0);
+	while(lock->isLocked==1&&lock->owner!=current->id){
+		interrupts_set(enabled);
+		thread_sleep(lock->wq);
+	}
+	lock->isLocked=1;
+	lock->owner=current->id;
+	interrupts_set(enabled);
 }
 
 void
 lock_release(struct lock *lock)
 {
+/* release the lock. be sure to check that the lock had been acquired by the
+ * calling thread, before it is released. wakeup all threads that are waiting to
+ * acquire the lock. */
 	assert(lock != NULL);
-
-	TBD();
+	int enabled=interrupts_set(0);
+	if(lock->isLocked==1&&lock->owner==current->id){
+		lock->isLocked=0;
+		lock->owner=-1;
+		interrupts_set(enabled);
+		thread_wakeup(lock->wq,1);
+	}
+	interrupts_set(enabled);
+	
 }
 
 struct cv {
 	/* ... Fill this in ... */
+	//0 for unlock ;1 for locked
+	struct wait_queue *wq;
 };
 
 struct cv *
 cv_create()
-{
+{	
 	struct cv *cv;
-
 	cv = malloc(sizeof(struct cv));
+	cv->wq=wait_queue_create();
 	assert(cv);
-
-	TBD();
-
 	return cv;
 }
 
 void
 cv_destroy(struct cv *cv)
-{
+{	
 	assert(cv != NULL);
-
-	TBD();
-
+	wait_queue_destroy(cv->wq);
 	free(cv);
 }
 
 void
 cv_wait(struct cv *cv, struct lock *lock)
 {
+/* suspend the calling thread on the condition variable cv. be sure to check
+ * that the calling thread had acquired lock when this call is made. you will
+ * need to release the lock before waiting, and reacquire it before returning
+ * from wait. */
+ /* Why do we need wait? when we enter the critical section, we want to get 
+ some resourses other than the lock, but it's not available right now, so we'd
+ better let other thread runs first, and when they're done, they'll call wakeup,
+ then this thread should be moved from blocked queue to ready queue again. Release
+ the lock and sleep should be done atomicaaly. else(sleep while holding a lock,
+ no one can run(producer-consumer problem). or release lock first, then wakeup might 
+ be lost). When the thread gets to run next,it should be still in the critical section*/
 	assert(cv != NULL);
 	assert(lock != NULL);
-
-	TBD();
+	if(lock->owner==current->id){
+		lock_release(lock);
+		thread_sleep(cv->wq);
+		//release thr lock and sleep atomically
+		//when this  thread will run again? some one wakes it up and
+		//scheduler choose to run it.If it's in the critical section
+		//it should still hold the lock after the wait return.
+		lock_acquire(lock);
+	}
 }
 
 void
 cv_signal(struct cv *cv, struct lock *lock)
 {
+
+/* wake up one thread that is waiting on the condition variable cv. be sure to
+ * check that the calling thread had acquired lock when this call is made. */
 	assert(cv != NULL);
 	assert(lock != NULL);
-
-	TBD();
-}
+	if(lock->owner==current->id)
+		thread_wakeup(cv->wq,0);
+	
+}	
 
 void
 cv_broadcast(struct cv *cv, struct lock *lock)
 {
+	/* wake up all threads that are waiting on the condition variable cv. be sure to
+ * check that the calling thread had acquired lock when this call is made. */
 	assert(cv != NULL);
 	assert(lock != NULL);
-
-	TBD();
+	if(lock->owner==current->id)
+		thread_wakeup(cv->wq,1);
 }
