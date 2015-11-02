@@ -37,13 +37,13 @@ void
 thread_stub(void (*thread_main)(void *), void *arg)
 {
 	Tid ret;
-	int enabled=interrupts_set(1);
+	interrupts_set(1);
 	/* when create a new thread, i.e. call tread_main() function, we need to make
 	sure interrupt is on, because somehow we need to call set_context or more precisely,
 	we need to switch the register
 	*/
 	thread_main(arg); // call thread_main() function with arg
-	interrupts_set(enabled);
+	//interrupts_set(enabled);
 	ret = thread_exit(THREAD_SELF);
 	// we should only get here if we are the last thread. 
 	assert(ret == THREAD_NONE);
@@ -201,14 +201,12 @@ thread_create(void (*fn) (void *), void *parg)
  * THREAD_NOMORE: no more threads can be created.
  * THREAD_NOMEMORY: no more memory available to create a thread stack. 
  
-
  to create a new thread, you will use getcontext to create a valid context,
  but you will leave the current thread running; you (the current thread, actually) 
  will then change a few registers in this valid context to initialize it as a new thread, 
  and put this new thread into the ready queue; finally, at some point, the new thread will
  be chosen by the scheduler, and it will run when setcontext is called on this new 
  thread's context.
-
 when creating a thread, you can't just make a copy of the current thread's context (using getcontext).
 You need to make a copy and then change four things:
 You need to change the program counter to point to the first function that the thread should run.
@@ -305,14 +303,15 @@ thread_yield(Tid want_tid)
  			
  			int ret=current->id;//necessary,otherwise,when switch back,it will return the 
  			//original id
- 			interrupts_set(enabled);
  			getcontext(old->mycontext);
  			mark++;
  			if(mark>=2) {
+ 			interrupts_set(enabled);
  				return ret;
  			}
  			else{
  				setcontext(current->mycontext);
+ 				interrupts_set(enabled);
  				return ret;
  			}
  			//when switch back, current is still the running thread, so it won't 
@@ -338,13 +337,15 @@ thread_yield(Tid want_tid)
  			current->next=NULL;
  			int ret=current->id;//necessary,otherwise,when switch back,it will return the 
  			//original id
- 			interrupts_set(enabled);
  			getcontext(old->mycontext);
  			mark++;
- 			if(mark>=2) 
+ 			if(mark>=2) {
+ 				interrupts_set(enabled);
  				return ret;
+ 				}
  			else{
  				setcontext(current->mycontext);
+ 				interrupts_set(enabled);
  				return ret;
  			}
 		}
@@ -428,8 +429,9 @@ thread_exit(Tid tid)
 			we'd like
 			thread_yield(THREAD_ANY);
 			*///
-			interrupts_set(enabled);
+			
 			thread_yield(THREAD_ANY);//modify thread yield
+			interrupts_set(enabled);
 			return tid;
 		}
 	}
@@ -549,7 +551,7 @@ thread_wakeup(struct wait_queue *queue, int all)
 
 struct lock {
 	/* ... Fill this in ... */
-	int isLocked;
+	int isLokced;
 	int owner;
 	//0 for unlock ;1 for locked
 	struct wait_queue *wq;
@@ -557,14 +559,13 @@ struct lock {
 
 struct lock *
 lock_create()
-{	int enabled=interrupts_set(0);
+{
 	struct lock *lock;
 	lock = malloc(sizeof(struct lock));
-	lock->isLocked=0;
+	lock->isLokced=0;
 	lock->owner=-1;
 	lock->wq=wait_queue_create();
 	assert(lock);
-	interrupts_set(enabled);
 	return lock;
 }
 
@@ -574,12 +575,11 @@ lock_destroy(struct lock *lock)
 /* destroy the lock. be sure to check that the lock is available when it is
  * being destroyed. */
 	assert(lock != NULL);
-	int enabled=interrupts_set(0);
-	if(lock->isLocked==0&&lock->wq==NULL){
-		//wait_queue_destroy(lock->wq);
+	if(lock->isLokced==0){
+		wait_queue_destroy(lock->wq);
 		free(lock);
 	}
-	interrupts_set(enabled);
+	
 }
 
 void
@@ -589,19 +589,15 @@ lock_acquire(struct lock *lock)
  * lock. */
 	assert(lock != NULL);
 	int enabled=interrupts_set(0);
-	if(lock->owner==current->id){
+	if(lock->isLokced==1&&lock->owner!=current->id){
 		interrupts_set(enabled);
-		return;
-	}
-	while(lock->isLocked==1&&lock->owner!=current->id){
-		//interrupts_set(enabled);
-		assert(!interrupts_enabled());
 		thread_sleep(lock->wq);
 	}
-	lock->isLocked=1;
-	lock->owner=current->id;
-	interrupts_set(enabled);
-	
+	else{
+		interrupts_set(enabled);
+		lock->isLokced=1;
+		lock->owner=current->id;
+	}
 }
 
 void
@@ -612,14 +608,11 @@ lock_release(struct lock *lock)
  * acquire the lock. */
 	assert(lock != NULL);
 	int enabled=interrupts_set(0);
-
-	if(lock->isLocked==1&&lock->owner==current->id){
-		lock->isLocked=0;
-		lock->owner=-1;
-		thread_wakeup(lock->wq,1);
+	if(lock->isLokced==1&&lock->owner==current->id){
 		interrupts_set(enabled);
+		thread_wakeup(lock->wq,1);
 	}
-	interrupts_set(enabled);
+	
 }
 
 struct cv {
