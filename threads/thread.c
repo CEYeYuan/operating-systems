@@ -619,54 +619,70 @@ lock_release(struct lock *lock)
 
 struct cv {
 	/* ... Fill this in ... */
+	//0 for unlock ;1 for locked
+	struct wait_queue *wq;
 };
 
 struct cv *
 cv_create()
-{
+{	
+	int enabled=interrupts_set(0);
 	struct cv *cv;
-
 	cv = malloc(sizeof(struct cv));
+	cv->wq=wait_queue_create();
 	assert(cv);
-
-	TBD();
-
+	interrupts_set(enabled);
 	return cv;
 }
 
 void
 cv_destroy(struct cv *cv)
-{
+{	int enabled=interrupts_set(0);
 	assert(cv != NULL);
-
-	TBD();
-
+	wait_queue_destroy(cv->wq);
 	free(cv);
+	interrupts_set(enabled);
 }
 
 void
 cv_wait(struct cv *cv, struct lock *lock)
 {
+/* suspend the calling thread on the condition variable cv. be sure to check
+ * that the calling thread had acquired lock when this call is made. you will
+ * need to release the lock before waiting, and reacquire it before returning
+ * from wait. */
 	assert(cv != NULL);
 	assert(lock != NULL);
-
-	TBD();
+	int enabled=interrupts_set(0);
+	lock_release(lock);
+	thread_sleep(cv->wq);
+	lock_acquire(lock);
+	interrupts_set(enabled);
 }
 
 void
 cv_signal(struct cv *cv, struct lock *lock)
 {
+
+/* wake up one thread that is waiting on the condition variable cv. be sure to
+ * check that the calling thread had acquired lock when this call is made. */
 	assert(cv != NULL);
 	assert(lock != NULL);
-
-	TBD();
+	int enabled=interrupts_set(0);
+	lock_acquire(lock);
+	thread_wakeup(cv->wq,0);
+	interrupts_set(enabled);
 }
 
 void
 cv_broadcast(struct cv *cv, struct lock *lock)
 {
+	/* wake up all threads that are waiting on the condition variable cv. be sure to
+ * check that the calling thread had acquired lock when this call is made. */
 	assert(cv != NULL);
 	assert(lock != NULL);
-
-	TBD();
+	int enabled=interrupts_set(0);
+	lock_acquire(lock);
+	thread_wakeup(cv->wq,1);
+	interrupts_set(enabled);
 }
