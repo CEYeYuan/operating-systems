@@ -500,23 +500,10 @@ thread_sleep(struct wait_queue *queue)
 	else{
 		current->status=blocked;
 		add_thread(queue->blockedQueue,current);
-		int counter=0;
 		int ret=0;
+		ret=thread_yield(THREAD_ANY);
 		interrupts_set(enabled);
-		/*why do we need to check how many times even if we disable the interrupt?
-		if not, after being woken up and chosen to run again, the first instruction to
-		run would be yield. So the original thread can not even finish the thread_sleep	
-		function.
-		*/
-		getcontext(current->mycontext);
-		counter++;
-		if(counter>=2){
-			return ret;
-		}
-		else{
-			ret=thread_yield(THREAD_ANY);
-			return ret;
-		}	
+		return ret;
 	}
 }
 
@@ -562,13 +549,14 @@ struct lock {
 
 struct lock *
 lock_create()
-{
+{	int enabled=interrupts_set(0);
 	struct lock *lock;
 	lock = malloc(sizeof(struct lock));
 	lock->isLocked=0;
 	lock->owner=-1;
 	lock->wq=wait_queue_create();
 	assert(lock);
+	interrupts_set(enabled);
 	return lock;
 }
 
@@ -578,10 +566,12 @@ lock_destroy(struct lock *lock)
 /* destroy the lock. be sure to check that the lock is available when it is
  * being destroyed. */
 	assert(lock != NULL);
+	int enabled=interrupts_set(0);
 	if(lock->isLocked==0){
 		wait_queue_destroy(lock->wq);
 		free(lock);
 	}
+	interrupts_set(enabled);
 	
 }
 
@@ -593,7 +583,23 @@ lock_acquire(struct lock *lock)
 	assert(lock != NULL);
 	int enabled=interrupts_set(0);
 	while(lock->isLocked==1&&lock->owner!=current->id){
-		interrupts_set(enabled);
+		/*#####!!!!!!!
+		//interrupts_set(enabled);
+		BUGGY!!! May cause LOST WAKEUP
+		while sleep while holding an interrupts disabled isn't a problem?
+		If it's a lock, others can not run. BUT since it just disable the
+		interrupt, other thread can still enable it.
+
+		acquire the lock->lock is acquired by other thread->sleep with 
+		interrupts disabled(that means we can not do preemptive scheduling)
+		But lock is only acquired when other thread do release, we don't even
+		need preemptive schedule. Since even we have been chosen by the scheduler,
+		other thread doesn't release the lock, it's just wasting time.
+
+		WHY THIS IS A PROBLEM?
+		after enable the interrupt, before sleep, other threads gets to run, and 
+		then calls release, no one gets waken up ! since we no one goes off to SLEEP!
+		*/
 		thread_sleep(lock->wq);
 	}
 	lock->isLocked=1;
@@ -678,7 +684,7 @@ cv_signal(struct cv *cv, struct lock *lock)
  * check that the calling thread had acquired lock when this call is made. */
 	assert(cv != NULL);
 	assert(lock != NULL);
-	if(lock->owner==current->id)
+	if(lock->owner==current->id&&lock->isLocked)
 		thread_wakeup(cv->wq,0);
 	
 }	
@@ -690,6 +696,6 @@ cv_broadcast(struct cv *cv, struct lock *lock)
  * check that the calling thread had acquired lock when this call is made. */
 	assert(cv != NULL);
 	assert(lock != NULL);
-	if(lock->owner==current->id)
+	if(lock->owner==current->id&&lock->isLocked)
 		thread_wakeup(cv->wq,1);
 }
