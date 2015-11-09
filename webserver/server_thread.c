@@ -79,13 +79,12 @@ stub(void *server){
 		pthread_mutex_lock(&lock);
 		while(in==out)
 			pthread_cond_wait(&empty,&lock);
-		pthread_mutex_unlock(&lock);
-		do_server_request(server,data[out]);
-		pthread_mutex_lock(&lock);
 		if((in-out+buffer_size)%buffer_size==buffer_size-1)
 			pthread_cond_signal(&full);
+		int conn=data[out];
 		out=(out+1)%buffer_size;
 		pthread_mutex_unlock(&lock);
+		do_server_request(server,conn);
 	}
 }
 /*pthread_create, pthread_mutex_init, pthread_mutex_lock, pthread_mutex_unlock, pthread_cond_init, pthread_cond_wait, and pthread_cond_signal*/
@@ -116,7 +115,7 @@ server_init(int nr_threads, int max_requests, int max_cache_size)
 			pthread_cond_init(&full, NULL);
 			int i;
 			for(i=0;i<nr_threads;i++){
-            	threads[i]=(pthread_t *) malloc (sizeof(pthread_t));
+            	//threads[i]=(pthread_t *) malloc (sizeof(pthread_t));
 			    int rc;
 				rc=pthread_create(threads[i],NULL,&stub,sv);
 				if (rc){
@@ -144,15 +143,16 @@ server_request(struct server *sv, int connfd)
 	} else {
 		/*  Save the relevant info in a buffer and have one of the
 		 *  worker threads do the work. */
-		//pthread_mutex_lock(&lock);
+		pthread_mutex_lock(&lock);
 		while((in-out+buffer_size)%buffer_size==buffer_size-1){
 			pthread_cond_wait(&full, &lock);//buffer is full; wait
 		}
+		pthread_mutex_unlock(&lock);
 		data[in]=connfd;
 		if(in==out)//if previously, the buffer is empty, some consumer(thread) might be blocked because of no request
 			pthread_cond_signal(&empty);
 		in=(in+1)%buffer_size;
-		//pthread_mutex_unlock(&lock);
+		pthread_mutex_unlock(&lock);
 		
 	}
 }
