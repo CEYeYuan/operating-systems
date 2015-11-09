@@ -9,10 +9,7 @@ struct server {
 	/* add any other parameters you need */
 };
 
-struct thread_data{
-	struct server *server;
-	int num;
-};
+
 
 /* static functions */
 
@@ -67,8 +64,8 @@ out:
 }
 
 /*GLOBAL VARIABLES*/
-pthread_t *threads;
-struct thread_data *data;
+pthread_t **threads;
+int *data;
 int in,out;
 pthread_mutex_t lock;
 pthread_cond_t full;
@@ -77,17 +74,19 @@ int buffer_size;
 
 
 void *
-stub(void *arg){
-	pthread_mutex_lock(&lock);
-	while(in==out)
-		pthread_cond_wait(&empty,&lock);
-	struct thread_data *data=(struct thread_data *)arg;
-	do_server_request(data->server,data->num);
-	if((in-out+buffer_size)%buffer_size==buffer_size-1)
-		pthread_cond_signal(&full);
-	out=(out+1)%buffer_size;
-	pthread_mutex_unlock(&lock);
-	pthread_exit(NULL);
+stub(void *server){
+	while(1){
+		pthread_mutex_lock(&lock);
+		while(in==out)
+			pthread_cond_wait(&empty,&lock);
+		pthread_mutex_unlock(&lock);
+		do_server_request(server,data[out]);
+		pthread_mutex_lock(&lock);
+		if((in-out+buffer_size)%buffer_size==buffer_size-1)
+			pthread_cond_signal(&full);
+		out=(out+1)%buffer_size;
+		pthread_mutex_unlock(&lock);
+	}
 }
 /*pthread_create, pthread_mutex_init, pthread_mutex_lock, pthread_mutex_unlock, pthread_cond_init, pthread_cond_wait, and pthread_cond_signal*/
 
@@ -106,34 +105,27 @@ server_init(int nr_threads, int max_requests, int max_cache_size)
 	if (nr_threads > 0 || max_requests > 0 || max_cache_size > 0) {
 		
 		if(nr_threads>=1){
-			pthread_mutex_init(&lock, NULL);
-			pthread_mutex_lock(&lock);
-			threads=malloc(sizeof(pthread_t)*(nr_threads+1));
+			data=malloc(sizeof(int)*(max_requests+1));
+			in=0;
+			out=0;
+			buffer_size=max_requests+1;
+			pthread_mutex_init(&lock, 0);
+			//pthread_mutex_lock(&lock);
+			threads=malloc(sizeof(pthread_t)*(nr_threads));
 			pthread_cond_init(&empty, NULL);
 			pthread_cond_init(&full, NULL);
 			int i;
 			for(i=0;i<nr_threads;i++){
-				/*
-				pthread_create (thread,attr,start_routine,arg);
-				thread: An opaque, unique identifier for the new thread returned by the subroutine.
-				attr: An opaque attribute object that may be used to set thread attributes. You can specify a thread attributes object, or NULL for the default values.
-				start_routine: the C routine that the thread will execute once it is created.
-				arg: A single argument that may be passed to start_routine. It must be passed by reference as a pointer cast of type void. NULL may be used if no argument is to be passed.
-				*/	
-			   int rc;
-				rc=pthread_create(&threads[i],NULL,stub,&data[i]);
+            	threads[i]=(pthread_t *) malloc (sizeof(pthread_t));
+			    int rc;
+				rc=pthread_create(threads[i],NULL,&stub,sv);
 				if (rc){
 					 printf("ERROR; return code from pthread_create() is %d\n", rc);
 					 exit(-1);
 				 }
 			}		
 	}
-	if(max_requests>=1){
-		data=malloc(sizeof(struct thread_data)*(max_requests+1));
-		in=0;
-		out=0;
-		buffer_size=max_requests+1;
-	}
+	
 	/* Lab 4: create queue of max_request size when max_requests > 0 */
 
 	/* Lab 5: init server cache and limit its size to max_cache_size */
@@ -141,7 +133,7 @@ server_init(int nr_threads, int max_requests, int max_cache_size)
 	/* Lab 4: create worker threads when nr_threads > 0 */
 
 	}
-	pthread_mutex_unlock(&lock);
+	//pthread_mutex_unlock(&lock);
 	return sv;
 }
 void
@@ -152,16 +144,15 @@ server_request(struct server *sv, int connfd)
 	} else {
 		/*  Save the relevant info in a buffer and have one of the
 		 *  worker threads do the work. */
-		pthread_mutex_lock(&lock);
+		//pthread_mutex_lock(&lock);
 		while((in-out+buffer_size)%buffer_size==buffer_size-1){
 			pthread_cond_wait(&full, &lock);//buffer is full; wait
 		}
-		(data+in)->server=sv;
-		(data+in)->num=connfd;
+		data[in]=connfd;
 		if(in==out)//if previously, the buffer is empty, some consumer(thread) might be blocked because of no request
 			pthread_cond_signal(&empty);
 		in=(in+1)%buffer_size;
-		pthread_mutex_unlock(&lock);
+		//pthread_mutex_unlock(&lock);
 		
 	}
 }
