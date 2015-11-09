@@ -143,16 +143,15 @@ server_request(struct server *sv, int connfd)
 	} else {
 		/*  Save the relevant info in a buffer and have one of the
 		 *  worker threads do the work. */
-		//pthread_mutex_lock(&lock);
+		pthread_mutex_lock(&lock);
 		while((in-out+buffer_size)%buffer_size==buffer_size-1){
 			pthread_cond_wait(&full, &lock);//buffer is full; wait
 		}
-		pthread_mutex_unlock(&lock);
 		data[in]=connfd;
 		if(in==out)//if previously, the buffer is empty, some consumer(thread) might be blocked because of no request
 			pthread_cond_signal(&empty);
 		in=(in+1)%buffer_size;
-		//pthread_mutex_unlock(&lock);
+		pthread_mutex_unlock(&lock);
 		
 	}
 }
