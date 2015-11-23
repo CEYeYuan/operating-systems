@@ -42,10 +42,7 @@ struct listnode{
 	struct listnode *next;
 	struct listnode *prev;
 	long size;
-} ;
-
-
-
+};
 
 
 
@@ -233,18 +230,14 @@ file_data_free(struct file_data *data)
 }
 
 static void
-do_server_request(struct server *sv, int connfd)               //still not move it out!!
+do_server_request(struct server *sv, int connfd)             
 {
         
 	int ret;
 	struct request *rq;
-//        struct request *REQUEST;              //the one you copy rq
  	struct file_data *data;
-        struct table *current;
-        unsigned int num;
-        
-//        int LENGTH_NAME , LENGTH_BUF;
-        int size; 
+    struct table *current;
+    int size; 
 	data = file_data_init();
 
 
@@ -259,32 +252,25 @@ do_server_request(struct server *sv, int connfd)               //still not move 
                 pthread_mutex_unlock(&cache_mutex);
                 ret = request_readfile(rq);
                 if (!ret)
-		       goto out;
+		      		 goto out;
                 pthread_mutex_lock(&cache_mutex);
                 size = data->file_size;
                 if(size < max_size){
-                       // if(cache_lookup(data)==0){
-                                if((max_size-current_size) > size)        //have enough space
-                                      if(lookup(data->file_name)==0) 
-                                        list_insert(data);
-                                      else;
+                      //only cache the file less than the total cache size
+                                if((max_size-current_size) > size&&lookup(data->file_name)==NULL)        //have enough space
+                                    list_insert(data);
                                 else{
+                                	if(size - (max_size-current_size)>0)
                                        cache_evict(size - (max_size-current_size)); 
-                                       if(lookup(data->file_name)==NULL)
+                                    if(lookup(data->file_name)==NULL)
                                           list_insert(data);
-                                       else;
                                 }
-                      //  }         
                 }  
               pthread_mutex_unlock(&cache_mutex); 
         }
-        else{                                           
-                 num = hashCode(data->file_name);
-                 current = map[num];
-      
-                 while(strcmp(current->data->file_name,data->file_name) != 0)        //find the one in cache
-                        current = current->next;
-                           
+        else{   //in the cache;          
+        		 pthread_mutex_lock(&cache_mutex);                           
+                 current = lookup(data->file_name);
                  data->file_buf = (char *)malloc( (strlen(current->data->file_buf)+1) * sizeof(char) );
                  strcpy(data->file_buf , current->data->file_buf);
                  data->file_size = current->data->file_size;
