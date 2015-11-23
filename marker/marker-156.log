@@ -1,20 +1,6 @@
-Warning: No xauth data; using fake authentication data for X11 forwarding.
-cc -MM *.c > .depend
-cc -g -Wall -Werror   -c -o server.o server.c
-cc -g -Wall -Werror   -c -o server_thread.o server_thread.c
-cc -g -Wall -Werror   -c -o request.o request.c
-cc -g -Wall -Werror   -c -o common.o common.c
-cc   server.o server_thread.o request.o common.o -lm -lpthread -lpopt  -o server
-cc -g -Wall -Werror   -c -o client_simple.o client_simple.c
-cc   client_simple.o common.o -lm -lpthread -lpopt  -o client_simple
-cc -g -Wall -Werror   -c -o client.o client.c
-cc   client.o common.o -lm -lpthread -lpopt  -o client
-cc -g -Wall -Werror   -c -o fileset.o fileset.c
-cc   fileset.o common.o -lm -lpthread -lpopt  -o fileset
-Running: /cad2/ece344f/tester/scripts/lab4-01-webserver.py 
-webserver test
-starting server at port 25321
-Mark for webserver test is 30 out of 30
-PASS
-
-You have received 30 marks out of a total of 30 marks.
+fatal: sent error to the client: git upload-archive: archiver died with error
+remote: fatal: no such ref: Lab5-end        
+remote: git upload-archive: archiver died with error
+tar: This does not look like a tar archive
+tar: Exiting with failure status due to previous errors
+git checkout was not successful

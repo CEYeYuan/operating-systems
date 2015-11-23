@@ -184,9 +184,9 @@ int remove_least_used(){
 		}
 }
 
-void cache_evict(int amount){
+void cache_evict(int needed){
         int size=0;
-        while(amount > size){ 
+        while(needed > size){ 
                size += remove_least_used(); 
         }  
         return;   
