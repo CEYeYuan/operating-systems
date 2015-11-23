@@ -17,11 +17,13 @@ struct server {
 long buckets =0;
 struct map *map;
 struct list *list;
+pthread_mutex_t cache_lock;
 
 struct map {
 	/* you can define this struct to have whatever fields you want. */
 	struct listnode **dict;
 	int cache;
+	int max;
 };
 
 struct list{
@@ -65,6 +67,7 @@ map_init(long size)
 	
 	map=malloc(sizeof(map));
 	map->cache=0;
+	map->max=size;
 	if(size<=0)	return;
 	buckets=size/351+1;
 	long j=0;
@@ -83,6 +86,7 @@ cache_evict(int amount_to_evict){
 		struct listnode *remove=list->head->prev;
 		remove->prev->next=remove->next;
 		remove->next->prev=remove->prev;
+		char *file_name=remove->word;
 		long index=hashCode(remove->word,buckets);
 		struct listnode *node=map->dict[index];
 		if(strcmp(node->word,file_name)==0){
@@ -92,9 +96,11 @@ cache_evict(int amount_to_evict){
 			current+=node->size;
 			map->cache-=node->size;
 			free(node);
+			free(remove->word);
 			free(remove);
 		}else{
 			struct listnode *fast=node->next;
+			char *file_name=remove->word;
 			while(strcmp(node->word,file_name)!=0){
 				fast=fast->next;
 				node=node->next;
@@ -104,30 +110,12 @@ cache_evict(int amount_to_evict){
 			current+=fast->size;
 			map->cache-=fast->size;
 			free(fast);
+			free(remove->word);
 			free(remove);
 			
 		}
 	}
 }
-struct listnode*
-lookup(char *file_name){
-	long index=hashCode(file_name,buckets);
-	if(!map->dict[index]){
-		return NULL;
-	}else{
-		struct listnode *node=map->dict[index];
-		while(node->next){
-			if(strcmp(node->word,file_name)==0){
-				return node;
-			}
-			node=node->next;
-		}
-		return NULL;
-	}
-}
-
-
-
 struct listnode*
 list_insert(char *file_name){
 	struct listnode* node= malloc(sizeof(struct listnode));
@@ -142,13 +130,41 @@ list_insert(char *file_name){
 	return node;
 }
 
+struct listnode*
+lookup(char *file_name){
+	long index=hashCode(file_name,buckets);
+	if(!map->dict[index]){
+		return NULL;
+	}else{
+		struct listnode *node=map->dict[index];
+		while(node->next){
+		//look up while reorder the list
+			if(strcmp(node->word,file_name)==0){
+				struct listnode *tmp=node->copy;
+				tmp->prev->next=tmp->next;
+				tmp->next->prev=tmp->prev;
+				node->copy=list_insert(tmp->word);
+				free(tmp->word);
+				free(tmp);
+				return node;
+			}
+			node=node->next;
+		}
+		return NULL;
+	}
+}
+
+
+
+
+
 void cache_insert(char *file_name,struct file_data *file_data){
 	struct listnode *result=lookup(file_name);
 	if(result!=NULL){
 	//existed in cache
-		map->cache-=sizeof(result->data);
+		map->cache-=file_data->file_size;
 		result->data=file_data;
-		map->cache+=sizeof(file_data);
+		map->cache+=file_data->file_size;
 	}
 	else{
 		long index=hashCode(file_name,buckets);
@@ -158,12 +174,12 @@ void cache_insert(char *file_name,struct file_data *file_data){
 				//init the bucket and linked list
 				struct listnode* node= malloc(sizeof(struct listnode));
 				node->word=malloc(strlen(file_name)+1);
-				node->size=sizeof(file_data);
+				node->size=file_data->file_size;
 				node->next=NULL;
 				node->data=file_data;
 				node->copy=list_insert(file_name);
 				map->dict[index]=node;
-				map->cache+=sizeof(file_data);
+				map->cache+=file_data->file_size;
 		}
 		else{
 				struct listnode *node=map->dict[index];
@@ -173,11 +189,11 @@ void cache_insert(char *file_name,struct file_data *file_data){
 				struct listnode* newword = malloc(sizeof(struct listnode));
 				newword->word=malloc(strlen(file_name)*sizeof(char)+1);
 				newword->data=file_data;
-				newword->size=sizeof(file_data);
+				newword->size=file_data->file_size;
 				newword->next=NULL;
 				node->copy=list_insert(file_name);
 				node->next=newword;
-				map->cache+=sizeof(file_data);
+				map->cache+=file_data->file_size;
 			
 			}		
 	}
@@ -229,11 +245,39 @@ do_server_request(struct server *sv, int connfd)
 	/* reads file, 
 	 * fills data->file_buf with the file contents,
 	 * data->file_size with file size. */
-	ret = request_readfile(rq);
+	pthread_mutex_lock(&cache_lock);
+	if(lookup(data->file_name)==NULL){
+		pthread_mutex_unlock(&cache_lock);
+		ret = request_readfile(rq);
+		if (!ret)
+			goto out;
+		//got the file after this line
+		pthread_mutex_lock(&cache_lock);
+		//check buffer size
+		if((map->max-map->cache)>=data->file_size)
+		//enough cache size
+			cache_insert(data->file_name,data);
+		else{
+			cache_evict(data->file_size-(map->max-map->cache));
+			cache_insert(data->file_name,data);
+		}
+		pthread_mutex_unlock(&cache_lock);
+		
+	}
+	else{
+		pthread_mutex_lock(&cache_lock);
+		struct listnode *node=lookup(data->file_name);
+		data->file_buf=(char *)malloc(sizeof(char)*(strlen(node->data->file_buf)+1));
+		strcpy(data->file_buf,node->data->file_buf);
+		data->file_size=node->size;
+		pthread_mutex_unlock(&cache_lock);
+	}
+	
 	if (!ret)
 		goto out;
 	/* sends file to client */
 	request_sendfile(rq);
+	//free(data->file_buf);
 out:
 	request_destroy(rq);
 	file_data_free(data);
