@@ -35,7 +35,6 @@ struct listnode{
 	struct file_data *data;
 	struct listnode *next;
 	struct listnode *prev;
-	struct listnode *copy;
 	long size;
 } ;
 
@@ -65,11 +64,13 @@ map_init(long size)
  * words. Note that the array is read only and cannot be modified. */
 
 	
-	map=malloc(sizeof(map));
+	map=malloc(sizeof(struct map));
 	map->cache=0;
 	map->max=size;
 	if(size<=0)	return;
 	buckets=size/351+1;
+	if(buckets<=666)
+		buckets=667;
 	long j=0;
 	map->dict=malloc((buckets)*sizeof(struct listnode*));
 	while(j<buckets){
@@ -84,8 +85,12 @@ cache_evict(int amount_to_evict){
 	int current=0;
 	while(current<amount_to_evict&&map->cache!=0){
 		struct listnode *remove=list->head->prev;
-		remove->prev->next=remove->next;
-		remove->next->prev=remove->prev;
+		if(remove==list->head){
+			//empty list
+			break;
+		}
+		remove->prev->next=list->head;
+		list->head->prev=remove->prev;
 		char *file_name=remove->word;
 		long index=hashCode(remove->word,buckets);
 		struct listnode *node=map->dict[index];
@@ -101,10 +106,12 @@ cache_evict(int amount_to_evict){
 		}else{
 			struct listnode *fast=node->next;
 			char *file_name=remove->word;
-			while(strcmp(node->word,file_name)!=0){
+			while(fast!=NULL&&strcmp(fast->word,file_name)!=0){
 				fast=fast->next;
 				node=node->next;
 			}
+			if(fast==NULL)
+				break;
 			node->next=fast->next;
 			free(fast->data);
 			current+=fast->size;
@@ -130,22 +137,19 @@ list_insert(char *file_name){
 	return node;
 }
 
+
+
 struct listnode*
 lookup(char *file_name){
+//look up in the hashtable;
 	long index=hashCode(file_name,buckets);
 	if(!map->dict[index]){
 		return NULL;
 	}else{
 		struct listnode *node=map->dict[index];
-		while(node->next){
+		while(node!=NULL){
 		//look up while reorder the list
 			if(strcmp(node->word,file_name)==0){
-				struct listnode *tmp=node->copy;
-				tmp->prev->next=tmp->next;
-				tmp->next->prev=tmp->prev;
-				node->copy=list_insert(tmp->word);
-				free(tmp->word);
-				free(tmp);
 				return node;
 			}
 			node=node->next;
@@ -156,44 +160,42 @@ lookup(char *file_name){
 
 
 
-
-
 void cache_insert(char *file_name,struct file_data *file_data){
 	struct listnode *result=lookup(file_name);
 	if(result!=NULL){
 	//existed in cache
-		map->cache-=file_data->file_size;
+		map->cache-=result->size;
 		result->data=file_data;
+		result->size=file_data->file_size;
 		map->cache+=file_data->file_size;
 	}
 	else{
+	    list_insert(file_data->file_name);
 		long index=hashCode(file_name,buckets);
 		if(!map->dict[index]){
 
 				//this is the first word that hashed to that bucket
 				//init the bucket and linked list
 				struct listnode* node= malloc(sizeof(struct listnode));
-				node->word=malloc(strlen(file_name)+1);
-				strcpy(node->word,file_name);
+				node->word=malloc(strlen(file_data->file_name)+1);
+				strcpy(node->word,file_data->file_name);
 				node->size=file_data->file_size;
 				node->next=NULL;
 				node->data=file_data;
-				node->copy=list_insert(file_name);
 				map->dict[index]=node;
 				map->cache+=file_data->file_size;
 		}
 		else{
 				struct listnode *node=map->dict[index];
-				while(node->next){
+				while(node->next!=NULL){
 						node=node->next;
 				}
 				struct listnode* newword = malloc(sizeof(struct listnode));
-				newword->word=malloc(strlen(file_name)*sizeof(char)+1);
+				newword->word=malloc(strlen(file_data->file_name)*sizeof(char)+1);
 				strcpy(node->word,file_name);
 				newword->data=file_data;
 				newword->size=file_data->file_size;
 				newword->next=NULL;
-				node->copy=list_insert(file_name);
 				node->next=newword;
 				map->cache+=file_data->file_size;
 			
@@ -275,8 +277,8 @@ do_server_request(struct server *sv, int connfd)
 		pthread_mutex_unlock(&cache_lock);
 	}
 	
-	if (!ret)
-		goto out;
+	/*if (!ret)
+		goto out;*/
 	/* sends file to client */
 	request_sendfile(rq);
 	//free(data->file_buf);
