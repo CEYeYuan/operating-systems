@@ -120,8 +120,8 @@ struct listnode*
 list_insert(char *file_name){
 	struct listnode* node= malloc(sizeof(struct listnode));
 	node->word=malloc(strlen(file_name)+1);
+	strcpy(node->word,file_name);
 	struct listnode *head=list->head;
-	//lru 
 	struct listnode *tmp=head->next;
 	head->next=node;
 	node->prev=head;
@@ -174,6 +174,7 @@ void cache_insert(char *file_name,struct file_data *file_data){
 				//init the bucket and linked list
 				struct listnode* node= malloc(sizeof(struct listnode));
 				node->word=malloc(strlen(file_name)+1);
+				strcpy(node->word,file_name);
 				node->size=file_data->file_size;
 				node->next=NULL;
 				node->data=file_data;
@@ -188,6 +189,7 @@ void cache_insert(char *file_name,struct file_data *file_data){
 				}
 				struct listnode* newword = malloc(sizeof(struct listnode));
 				newword->word=malloc(strlen(file_name)*sizeof(char)+1);
+				strcpy(node->word,file_name);
 				newword->data=file_data;
 				newword->size=file_data->file_size;
 				newword->next=NULL;
