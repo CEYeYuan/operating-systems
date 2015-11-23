@@ -1,6 +1,9 @@
-Mon Nov  9 13:03:39 EST 2015
+Mon Nov 23 12:46:15 EST 2015
 Running threads experiment. Output goes to plot-threads.out
 Threads experiment done.
-Mon Nov  9 13:12:43 EST 2015
+Mon Nov 23 12:55:12 EST 2015
 Running requests experiment. Output goes to plot-requests.out
 Requests experiment done.
+Mon Nov 23 12:57:40 EST 2015
+Running cachesize experiment. Output goes to plot-cachesize.out
+Cachesize experiment done.
