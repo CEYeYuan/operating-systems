@@ -7,6 +7,12 @@
 #include "common.h"
 #include <string.h>
 #include <ctype.h>
+#define HASH_TABLE_SIZE 3571
+pthread_mutex_t cache_mutex;
+int CURRENT_SIZE=0;    
+int MAX_SIZE; 
+int buckets;
+
 
 struct server {
 	int nr_threads;
@@ -14,194 +20,203 @@ struct server {
 	int max_cache_size;
 	/* add any other parameters you need */
 };
-long buckets =0;
-struct map *map;
-struct list *list;
-pthread_mutex_t cache_lock;
-
-struct map {
-	/* you can define this struct to have whatever fields you want. */
-	struct listnode **dict;
-	int cache;
-	int max;
+struct DATA{                                    
+        struct file_data *FILE_DATA;
+        struct DATA *next; 
 };
 
-struct list{
-	struct listnode *head;
+struct DATA** hashTable;
+
+struct NAME_LIST{
+        char *FILE_NAME;
+        struct NAME_LIST *next;
 };
 
-struct listnode{
-	char * word;
-	struct file_data *data;
-	struct listnode *next;
-	struct listnode *prev;
-	long size;
-} ;
+struct lru{                             //list of file name, use to find the one to be evicted
+        struct NAME_LIST *head;
+        struct NAME_LIST *tail;
+};
 
-long hashCode(char *key, long size){
+struct lru *LRU;
 
-    long hashVal = 0;
-    int i = 0;
-    while( i < strlen(key)) {
-      hashVal = (127 * hashVal + *(key+i)) % size;
-      i++;
-    }
-    if(hashVal<0)	return -1*hashVal;
-    else
-    	return hashVal;
-}
+int cal_hash_number(char *name){
 
-
-void
-map_init(long size)
-{
-//size means the size of cache
-/* Initialize wc data structure, returning pointer to it. The input to this
- * function is an array of characters. The length of this array is size.
- * The array contains a sequence of words, separated by spaces. You need to
- * parse this array for words, and initialize your data structure with the words
- * in the array. You can use the isspace() function to look for spaces between
- * words. Note that the array is read only and cannot be modified. */
-
-	
-	map=malloc(sizeof(struct map));
-	map->cache=0;
-	map->max=size;
-	if(size<=0)	return;
-	buckets=size/351+1;
-	if(buckets<=666)
-		buckets=667;
-	long j=0;
-	map->dict=malloc((buckets)*sizeof(struct listnode*));
-	while(j<buckets){
-		map->dict[j]=NULL;
-		j++;		
+	unsigned long h=0,g;
+	while(*name){
+		h=(h<<4)+(*name++);
+		if((g=h&0xf0000000)!=0)
+			h^=g>>24;
+		h&=~g;
 	}
-}
-
-//cache_lookup(file), cache_insert(file), and cache_evict(amount_to_evict)
-void 
-cache_evict(int amount_to_evict){
-	int current=0;
-	while(current<amount_to_evict&&map->cache!=0){
-		struct listnode *remove=list->head->prev;
-		if(remove==list->head){
-			//empty list
-			break;
-		}
-		remove->prev->next=list->head;
-		list->head->prev=remove->prev;
-		char *file_name=remove->word;
-		long index=hashCode(remove->word,buckets);
-		struct listnode *node=map->dict[index];
-		if(strcmp(node->word,file_name)==0){
-			//the first node in the bucket
-			map->dict[index]=node->next;
-			free(node->data);
-			current+=node->size;
-			map->cache-=node->size;
-			free(node);
-			free(remove->word);
-			free(remove);
-		}else{
-			struct listnode *fast=node->next;
-			char *file_name=remove->word;
-			while(fast!=NULL&&strcmp(fast->word,file_name)!=0){
-				fast=fast->next;
-				node=node->next;
-			}
-			if(fast==NULL)
-				break;
-			node->next=fast->next;
-			free(fast->data);
-			current+=fast->size;
-			map->cache-=fast->size;
-			free(fast);
-			free(remove->word);
-			free(remove);
-			
-		}
-	}
-}
-struct listnode*
-list_insert(char *file_name){
-	struct listnode* node= malloc(sizeof(struct listnode));
-	node->word=malloc(strlen(file_name)+1);
-	strcpy(node->word,file_name);
-	struct listnode *head=list->head;
-	struct listnode *tmp=head->next;
-	head->next=node;
-	node->prev=head;
-	node->next=tmp;
-	tmp->prev=node;
-	return node;
+	return h % HASH_TABLE_SIZE;
 }
 
 
 
-struct listnode*
-lookup(char *file_name){
-//look up in the hashtable;
-	long index=hashCode(file_name,buckets);
-	if(!map->dict[index]){
-		return NULL;
-	}else{
-		struct listnode *node=map->dict[index];
-		while(node!=NULL){
-		//look up while reorder the list
-			if(strcmp(node->word,file_name)==0){
-				return node;
-			}
-			node=node->next;
-		}
-		return NULL;
-	}
+void hashTable_insert(struct file_data *data){           //insert new file data into hashtable
+        int num;
+        struct DATA *current,*new_point;
+        int LENGTH_NAME , LENGTH_BUF;
+        
+        LENGTH_NAME = strlen(data->file_name)+1;
+        LENGTH_BUF = strlen(data->file_buf)+1;
+        
+        new_point = malloc(sizeof (struct DATA));
+        new_point->FILE_DATA = malloc(sizeof (struct file_data));
+        new_point->FILE_DATA->file_name = (char*)malloc(LENGTH_NAME * sizeof(char));
+        new_point->FILE_DATA->file_buf = (char*)malloc(LENGTH_BUF * sizeof(char));
+
+        strcpy(new_point->FILE_DATA->file_name , data->file_name);  
+        strcpy(new_point->FILE_DATA->file_buf , data->file_buf );
+        new_point->FILE_DATA->file_size = data->file_size;
+//	fprintf(stderr, "\n hashtable insert = %s : %d\n",new_point->FILE_DATA->file_name,new_point->FILE_DATA->file_size);
+                       
+        new_point->next = NULL;
+          
+        CURRENT_SIZE += data->file_size;
+        num = cal_hash_number(data->file_name);
+        current = hashTable[num];
+        if(current ==NULL){
+                   hashTable[num] = new_point;
+        }
+        else{
+                   while(current->next){                 //add to tail of list
+                         current = current->next;
+                   }
+                   current->next = new_point;
+        }
+        return;
+}
+
+
+void cache_insert(struct file_data *data){          //failed in lookup, run this to insert cache
+        struct NAME_LIST *new_name;
+        int LENGTH_NAME = strlen(data->file_name)+1;
+        new_name = malloc(sizeof (struct NAME_LIST));
+        new_name->FILE_NAME = (char*)malloc(LENGTH_NAME * sizeof(char)); 
+        new_name->next = NULL;
+
+        strcpy(new_name->FILE_NAME , data->file_name);  
+        if(LRU->head == NULL){              //if LRU is NULL now
+             LRU->head = new_name;
+             LRU->tail = new_name;
+        } 
+        else{
+             LRU->tail->next = new_name;          //LRU has elements now
+             LRU->tail = LRU->tail->next;
+        }
+//         fprintf(stderr, "\n insert is = %s \n",LRU->tail->FILE_NAME); 
+        hashTable_insert(data);
+        return;
 }
 
 
 
-void cache_insert(char *file_name,struct file_data *file_data){
-	struct listnode *result=lookup(file_name);
-	if(result!=NULL){
-	//existed in cache
-		map->cache-=result->size;
-		result->data=file_data;
-		result->size=file_data->file_size;
-		map->cache+=file_data->file_size;
-	}
-	else{
-	    list_insert(file_data->file_name);
-		long index=hashCode(file_name,buckets);
-		if(!map->dict[index]){
-
-				//this is the first word that hashed to that bucket
-				//init the bucket and linked list
-				struct listnode* node= malloc(sizeof(struct listnode));
-				node->word=malloc(strlen(file_data->file_name)+1);
-				strcpy(node->word,file_data->file_name);
-				node->size=file_data->file_size;
-				node->next=NULL;
-				node->data=file_data;
-				map->dict[index]=node;
-				map->cache+=file_data->file_size;
+int cache_lookup(struct file_data *data){          //return 0: not find         return 1: find in cache
+        struct DATA *current = NULL;
+        unsigned int num;                          
+        num = cal_hash_number(data->file_name);
+        current = hashTable[num];
+        if(current == NULL)  return 0;
+        while(current){                 //current is not NULL, therefore run this one
+                if(strcmp(current->FILE_DATA->file_name,data->file_name) == 0){        
+		        //strcpy(rq->data->file_buf , current->FILE_DATA->file_buf);
+                        //rq->data->file_size = current->FILE_DATA->file_size;
+               //data = current->FILE_DATA;
+                    //    cache_modify(current->FILE_DATA->file_name);                     //modify the sequence
+                        return 1;
 		}
 		else{
-				struct listnode *node=map->dict[index];
-				while(node->next!=NULL){
-						node=node->next;
-				}
-				struct listnode* newword = malloc(sizeof(struct listnode));
-				newword->word=malloc(strlen(file_data->file_name)*sizeof(char)+1);
-				strcpy(node->word,file_name);
-				newword->data=file_data;
-				newword->size=file_data->file_size;
-				newword->next=NULL;
-				node->next=newword;
-				map->cache+=file_data->file_size;
-			
-			}		
+			current = current->next;
+		}
 	}
+        return 0; 
+}
 
+
+int clear_hashtable(char *file_name){
+        struct DATA *previous,*current;
+        int size;
+        int num;  
+//        fprintf(stderr, "\n file_name is = %s \n",file_name);   
+        num = cal_hash_number(file_name);
+        current = hashTable[num];
+    //    if(current == NULL) return 1000;
+     //   fprintf(stderr, "\n current one is = %s : %d\n",current->FILE_DATA->file_name,current->FILE_DATA->file_size);
+        if(strcmp(current->FILE_DATA->file_name,file_name) == 0){      //is the first one
+               hashTable[num] = current->next;
+               size = current->FILE_DATA->file_size;
+               CURRENT_SIZE -= size;
+               
+               free(current->FILE_DATA->file_name);
+               current->FILE_DATA->file_name = NULL;
+               free(current->FILE_DATA->file_buf);
+               current->FILE_DATA->file_buf = NULL; 
+               free(current->FILE_DATA);
+               current->FILE_DATA = NULL;                   
+               free(current); 
+
+               return size;
+        }
+        else{
+               previous = current;
+               current = current->next;
+               while(strcmp(current->FILE_DATA->file_name,file_name) != 0){
+                     previous = current;
+                     current = current->next;
+               }
+               previous->next = current->next;               //must have one, so no need to check
+               size = current->FILE_DATA->file_size;
+               CURRENT_SIZE -= size;    
+                           
+               free(current->FILE_DATA->file_name);
+               current->FILE_DATA->file_name = NULL;
+               free(current->FILE_DATA->file_buf);
+               current->FILE_DATA->file_buf = NULL;
+               free(current->FILE_DATA);
+               current->FILE_DATA = NULL;
+               free(current);
+
+               return size;
+        }
+}
+
+
+int clear_cache(){        //clear the tail of LRU
+        int size=0;
+//        char *name;
+//        int LENGTH_NAME;
+        struct NAME_LIST  *current;
+        current = LRU->head;
+//     
+        if(current->next == NULL){            //only 1 in LRU
+//                strcpy(name , current->FILE_NAME);                 
+                LRU->head = NULL;
+                LRU->tail = NULL;
+                size = clear_hashtable(current->FILE_NAME);
+                free(current->FILE_NAME);
+                current->FILE_NAME = NULL;
+                free(current);  
+                return size;                              
+        }
+        else{
+//                strcpy(name , current->FILE_NAME); 
+                LRU->head = current->next; 
+                size = clear_hashtable(current->FILE_NAME);
+                free(current->FILE_NAME);
+                current->FILE_NAME = NULL; 
+                free(current);
+                return size;
+        }      
+}
+
+
+void cache_evict(int amount){
+        int size=0;
+        while(amount > size){ 
+               size += clear_cache(); 
+        }  
+        return;   
 }
 
 
@@ -232,13 +247,20 @@ file_data_free(struct file_data *data)
 }
 
 static void
-do_server_request(struct server *sv, int connfd)
+do_server_request(struct server *sv, int connfd)               //still not move it out!!
 {
+        
 	int ret;
 	struct request *rq;
-	struct file_data *data;
-
+//        struct request *REQUEST;              //the one you copy rq
+ 	struct file_data *data;
+        struct DATA *current;
+        unsigned int num;
+        
+//        int LENGTH_NAME , LENGTH_BUF;
+        int size; 
 	data = file_data_init();
+
 
 	/* fills data->file_name with name of the file being requested */
 	rq = request_init(connfd, data);
@@ -246,46 +268,52 @@ do_server_request(struct server *sv, int connfd)
 		file_data_free(data);
 		return;
 	}
-	/* reads file, 
-	 * fills data->file_buf with the file contents,
-	 * data->file_size with file size. */
-	pthread_mutex_lock(&cache_lock);
-	if(lookup(data->file_name)==NULL){
-		pthread_mutex_unlock(&cache_lock);
-		ret = request_readfile(rq);
-		if (!ret)
-			goto out;
-		//got the file after this line
-		pthread_mutex_lock(&cache_lock);
-		//check buffer size
-		if((map->max-map->cache)>=data->file_size)
-		//enough cache size
-			cache_insert(data->file_name,data);
-		else{
-			cache_evict(data->file_size-(map->max-map->cache));
-			cache_insert(data->file_name,data);
-		}
-		pthread_mutex_unlock(&cache_lock);
-		
-	}
-	else{
-		pthread_mutex_lock(&cache_lock);
-		struct listnode *node=lookup(data->file_name);
-		data->file_buf=(char *)malloc(sizeof(char)*(strlen(node->data->file_buf)+1));
-		strcpy(data->file_buf,node->data->file_buf);
-		data->file_size=node->size;
-		pthread_mutex_unlock(&cache_lock);
-	}
-	
-	/*if (!ret)
-		goto out;*/
-	/* sends file to client */
+        pthread_mutex_lock(&cache_mutex);
+        if(cache_lookup(data)==0){             //not find in cache
+                pthread_mutex_unlock(&cache_mutex);
+                ret = request_readfile(rq);
+                if (!ret)
+		       goto out;
+                pthread_mutex_lock(&cache_mutex);
+                size = data->file_size;
+                if(size < MAX_SIZE){
+                       // if(cache_lookup(data)==0){
+                                if((MAX_SIZE-CURRENT_SIZE) > size)        //have enough space
+                                      if(cache_lookup(data)==0) 
+                                        cache_insert(data);
+                                      else;
+                                else{
+                                       cache_evict(size - (MAX_SIZE-CURRENT_SIZE)); 
+                                       if(cache_lookup(data)==0)
+                                          cache_insert(data);
+                                       else;
+                                }
+                      //  }         
+                }  
+              pthread_mutex_unlock(&cache_mutex); 
+        }
+        else{                                           
+                 num = cal_hash_number(data->file_name);
+                 current = hashTable[num];
+      
+                 while(strcmp(current->FILE_DATA->file_name,data->file_name) != 0)        //find the one in cache
+                        current = current->next;
+                           
+                 data->file_buf = (char *)malloc( (strlen(current->FILE_DATA->file_buf)+1) * sizeof(char) );
+                 strcpy(data->file_buf , current->FILE_DATA->file_buf);
+                 data->file_size = current->FILE_DATA->file_size;
+                 pthread_mutex_unlock(&cache_mutex); 
+        }
+
+     
+        
 	request_sendfile(rq);
-	//free(data->file_buf);
+
 out:
 	request_destroy(rq);
 	file_data_free(data);
 }
+
 
 /*GLOBAL VARIABLES*/
 pthread_t **threads;
@@ -315,6 +343,9 @@ stub(void *server){
 
 
 /* entry point functions */
+
+
+
 struct server *
 server_init(int nr_threads, int max_requests, int max_cache_size)
 {
@@ -324,12 +355,16 @@ server_init(int nr_threads, int max_requests, int max_cache_size)
 	sv->nr_threads = nr_threads;
 	sv->max_requests = max_requests;
 	sv->max_cache_size = max_cache_size;
-	map_init(max_cache_size);
-	list=malloc(sizeof(struct list));
-	list->head=malloc(sizeof(struct listnode));
-	list->head->prev=list->head;
-	list->head->next=list->head;
-	
+	buckets=max_cache_size/351+1;
+	if(buckets<=666)
+		buckets=667;
+    LRU = malloc(sizeof (struct lru));
+        LRU->head = NULL;
+        LRU->tail = NULL;
+		hashTable=malloc(sizeof(struct DATA*)*buckets);
+        int i;
+        for(i=0;i<buckets;i++)
+               hashTable[i] = NULL;
 
 	if (nr_threads > 0 || max_requests > 0 || max_cache_size > 0) {
 		
@@ -339,7 +374,6 @@ server_init(int nr_threads, int max_requests, int max_cache_size)
 			out=0;
 			buffer_size=max_requests+1;
 			pthread_mutex_init(&lock, 0);
-			//pthread_mutex_lock(&lock);
 			threads=malloc(sizeof(pthread_t)*(nr_threads));
 			pthread_cond_init(&empty, NULL);
 			pthread_cond_init(&full, NULL);
