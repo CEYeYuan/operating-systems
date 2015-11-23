@@ -10,7 +10,7 @@
 pthread_mutex_t cache_mutex;
 int current_size=0;    
 int max_size; 
-int buckets;
+int buckets=3351;
 struct table** map; 
 struct list *list;
 
@@ -267,6 +267,7 @@ do_server_request(struct server *sv, int connfd)
                                 }
                 }  
               pthread_mutex_unlock(&cache_mutex); 
+              request_sendfile(rq);
         }
         else{   //in the cache;          
         		 pthread_mutex_lock(&cache_mutex);                           
@@ -275,11 +276,9 @@ do_server_request(struct server *sv, int connfd)
                  strcpy(data->file_buf , current->data->file_buf);
                  data->file_size = current->data->file_size;
                  pthread_mutex_unlock(&cache_mutex); 
+                 request_sendfile(rq);
         }
 
-     
-        
-	request_sendfile(rq);
 
 out:
 	request_destroy(rq);
@@ -327,9 +326,9 @@ server_init(int nr_threads, int max_requests, int max_cache_size)
 	sv->nr_threads = nr_threads;
 	sv->max_requests = max_requests;
 	sv->max_cache_size = max_cache_size;
-	buckets=max_cache_size/31+1;
-	if(buckets<=332)
-		buckets=333;
+	//buckets=max_cache_size/31+1;
+	//if(buckets<=332)
+		//buckets=333;
     list=malloc(sizeof(struct list));
     list->head=malloc(sizeof(struct listnode));
     list->head->prev=list->head;
