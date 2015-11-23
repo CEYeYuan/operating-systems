@@ -10,7 +10,7 @@
 pthread_mutex_t cache_mutex;
 int current_size=0;    
 int max_size; 
-int buckets=3351;
+int buckets;
 struct table** map; 
 struct list *list;
 
@@ -21,13 +21,9 @@ struct server {
 	int max_cache_size;
 	/* add any other parameters you need */
 };
-struct DATA{                                    
-        struct file_data *FILE_DATA;
-        struct DATA *next; 
-};
 
 struct table{
-	char *word;
+	//char *word;
 	struct file_data *data;
 	struct table *next;
 };
@@ -68,13 +64,7 @@ lookup(char *file_name){
 		struct table *node=map[index];
 		while(node!=NULL){
 		//look up while reorder the list
-			if(strcmp(node->word,file_name)==0){
-				/*struct listnode *tmp=node->copy;
-				tmp->prev->next=tmp->next;
-				tmp->next->prev=tmp->prev;
-				node->copy=list_insert(tmp->word);
-				free(tmp->word);
-				free(tmp);*/
+			if(strcmp(node->data->file_name,file_name)==0){
 				return node;
 			}
 			node=node->next;
@@ -98,8 +88,8 @@ void cache_insert(struct file_data *file_data){
 				//this is the first word that hashed to that bucket
 				//init the bucket and linked list
 				struct table* node= malloc(sizeof(struct table));
-				node->word=malloc(strlen(file_data->file_name)+1);
-				strcpy(node->word,file_data->file_name);
+				node->data->file_name=malloc(strlen(file_data->file_name)+1);
+				strcpy(node->data->file_name,file_data->file_name);
 				node->next=NULL;
 				node->data->file_buf=malloc((strlen(file_data->file_buf)+1) * sizeof(char));
 				node->data->file_size=file_data->file_size;
@@ -113,8 +103,8 @@ void cache_insert(struct file_data *file_data){
 						node=node->next;
 				}
 				struct table* newword = malloc(sizeof(struct listnode));
-				newword->word=malloc(strlen(file_data->file_name)*sizeof(char)+1);
-				strcpy(node->word,file_data->file_name);
+				newword->data->file_name=malloc(strlen(file_data->file_name)*sizeof(char)+1);
+				strcpy(node->data->file_name,file_data->file_name);
 				newword->data->file_buf=malloc((strlen(file_data->file_buf)+1) * sizeof(char));
 				strcpy(newword->data->file_buf,file_data->file_buf );
 				newword->data->file_size=file_data->file_size;
@@ -146,11 +136,11 @@ list_insert(struct file_data *data){
 
 
 
-int clear_hash(char *file_name){
+int remove_file(char *file_name){
 	int size;
 	long index=hashCode(file_name);
 	struct table* node=map[index];
-		if(strcmp(node->word,file_name)==0){
+		if(strcmp(node->data->file_name,file_name)==0){
 			//the first node in the bucket
 			map[index]=node->next;
 			size=node->data->file_size;
@@ -162,7 +152,7 @@ int clear_hash(char *file_name){
 			return size;
 		}else{
 			struct table *fast=node->next;
-			while(strcmp(fast->word,file_name)!=0){
+			while(strcmp(fast->data->file_name,file_name)!=0){
 				fast=fast->next;
 				node=node->next;
 			}
@@ -187,7 +177,7 @@ int remove_least_used(){
 		else{
 			remove->prev->next=remove->next;
 			remove->next->prev=remove->prev;
-			size = clear_hash(remove->word);
+			size = remove_file(remove->word);
 			free(remove->word);
 			free(remove);
 			return size;
@@ -326,9 +316,9 @@ server_init(int nr_threads, int max_requests, int max_cache_size)
 	sv->nr_threads = nr_threads;
 	sv->max_requests = max_requests;
 	sv->max_cache_size = max_cache_size;
-	//buckets=max_cache_size/31+1;
-	//if(buckets<=332)
-		//buckets=333;
+	buckets=max_cache_size/31+1;
+	if(buckets<=332)
+		buckets=333;
     list=malloc(sizeof(struct list));
     list->head=malloc(sizeof(struct listnode));
     list->head->prev=list->head;
