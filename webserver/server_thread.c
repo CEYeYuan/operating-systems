@@ -7,12 +7,12 @@
 #include "common.h"
 #include <string.h>
 #include <ctype.h>
-#define HASH_TABLE_SIZE 3571
 pthread_mutex_t cache_mutex;
-int CURRENT_SIZE=0;    
-int MAX_SIZE; 
+int current_size=0;    
+int max_size; 
 int buckets;
 struct DATA** hashTable;
+struct table** map; 
 struct list *list;
 
 
@@ -27,6 +27,11 @@ struct DATA{
         struct DATA *next; 
 };
 
+struct table{
+	char *word;
+	struct file_data *data;
+	struct table *next;
+};
 
 struct list{
 	struct listnode *head;
@@ -39,7 +44,7 @@ struct listnode{
 	struct listnode *prev;
 	long size;
 } ;
-;
+
 
 
 
@@ -58,10 +63,50 @@ long hashCode(char *key){
     	return hashVal;
 }
 
+/*void cache_insert(char *file_name,struct file_data *file_data){
+	struct listnode *result=lookup(file_name);
+	if(result!=NULL){
+	//existed in cache
+		map->cache-=file_data->file_size;
+		result->data=file_data;
+		map->cache+=file_data->file_size;
+	}
+	else{
+		long index=hashCode(file_name,buckets);
+		if(!map->dict[index]){
 
+				//this is the first word that hashed to that bucket
+				//init the bucket and linked list
+				struct listnode* node= malloc(sizeof(struct listnode));
+				node->word=malloc(strlen(file_name)+1);
+				strcpy(node->word,file_name);
+				node->size=file_data->file_size;
+				node->next=NULL;
+				node->data=file_data;
+				node->copy=list_insert(file_name);
+				map->dict[index]=node;
+				map->cache+=file_data->file_size;
+		}
+		else{
+				struct listnode *node=map->dict[index];
+				while(node->next){
+						node=node->next;
+				}
+				struct listnode* newword = malloc(sizeof(struct listnode));
+				newword->word=malloc(strlen(file_name)*sizeof(char)+1);
+				strcpy(node->word,file_name);
+				newword->data=file_data;
+				newword->size=file_data->file_size;
+				newword->next=NULL;
+				node->copy=list_insert(file_name);
+				node->next=newword;
+				map->cache+=file_data->file_size;
+			
+			}		
+	}
 
-
-
+}
+*/
 void hashTable_insert(struct file_data *data){           //insert new file data into hashtable
         int num;
         struct DATA *current,*new_point;
@@ -81,7 +126,7 @@ void hashTable_insert(struct file_data *data){           //insert new file data 
                        
         new_point->next = NULL;
           
-        CURRENT_SIZE += data->file_size;
+        current_size += data->file_size;
         num = hashCode(data->file_name);
         current = hashTable[num];
         if(current ==NULL){
@@ -99,7 +144,8 @@ void hashTable_insert(struct file_data *data){           //insert new file data 
 
 
 struct listnode*
-cache_insert(struct file_data *data){
+list_insert(struct file_data *data){
+//insert new cache to the list(as well as hash map, use the last line of function call) 
 	struct listnode* node= malloc(sizeof(struct listnode));
 	node->word=malloc(strlen(data->file_name)+1);
 	strcpy(node->word,data->file_name);
@@ -144,7 +190,7 @@ int clear_hashtable(char *file_name){
         if(strcmp(current->FILE_DATA->file_name,file_name) == 0){      //is the first one
                hashTable[num] = current->next;
                size = current->FILE_DATA->file_size;
-               CURRENT_SIZE -= size;
+               current_size -= size;
                
                free(current->FILE_DATA->file_name);
                current->FILE_DATA->file_name = NULL;
@@ -165,7 +211,7 @@ int clear_hashtable(char *file_name){
                }
                previous->next = current->next;               //must have one, so no need to check
                size = current->FILE_DATA->file_size;
-               CURRENT_SIZE -= size;    
+               current_size -= size;    
                            
                free(current->FILE_DATA->file_name);
                current->FILE_DATA->file_name = NULL;
@@ -262,16 +308,16 @@ do_server_request(struct server *sv, int connfd)               //still not move 
 		       goto out;
                 pthread_mutex_lock(&cache_mutex);
                 size = data->file_size;
-                if(size < MAX_SIZE){
+                if(size < max_size){
                        // if(cache_lookup(data)==0){
-                                if((MAX_SIZE-CURRENT_SIZE) > size)        //have enough space
+                                if((max_size-current_size) > size)        //have enough space
                                       if(cache_lookup(data)==0) 
-                                        cache_insert(data);
+                                        list_insert(data);
                                       else;
                                 else{
-                                       cache_evict(size - (MAX_SIZE-CURRENT_SIZE)); 
+                                       cache_evict(size - (max_size-current_size)); 
                                        if(cache_lookup(data)==0)
-                                          cache_insert(data);
+                                          list_insert(data);
                                        else;
                                 }
                       //  }         
