@@ -1,6 +1,12 @@
 #include "request.h"
 #include "server_thread.h"
 #include "common.h"
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include "common.h"
+#include <string.h>
+#include <ctype.h>
 
 struct server {
 	int nr_threads;
@@ -8,8 +14,102 @@ struct server {
 	int max_cache_size;
 	/* add any other parameters you need */
 };
+long buckets =0;
+struct map *map;
+
+struct map {
+	/* you can define this struct to have whatever fields you want. */
+	struct listnode **dict;
+};
+
+struct listnode{
+	char * word;
+	struct file_data *data;
+	struct listnode *next;
+} ;
+
+long hashCode(char *key, long size){
+
+    long hashVal = 0;
+    int i = 0;
+    while( i < strlen(key)) {
+      hashVal = (127 * hashVal + *(key+i)) % size;
+      i++;
+    }
+    if(hashVal<0)	return -1*hashVal;
+    else
+    	return hashVal;
+}
 
 
+void
+map_init(long size)
+{
+//size means the size of cache
+/* Initialize wc data structure, returning pointer to it. The input to this
+ * function is an array of characters. The length of this array is size.
+ * The array contains a sequence of words, separated by spaces. You need to
+ * parse this array for words, and initialize your data structure with the words
+ * in the array. You can use the isspace() function to look for spaces between
+ * words. Note that the array is read only and cannot be modified. */
+
+	
+	map=malloc(sizeof(map));
+	if(size<=0)	return;
+	buckets=size/351+1;
+	long j=0;
+	map->dict=malloc((buckets)*sizeof(struct listnode*));
+	while(j<buckets){
+		map->dict[j]=NULL;
+		j++;		
+	}
+}
+//cache_lookup(file), cache_insert(file), and cache_evict(amount_to_evict)
+void cache_insert(char *file_name,struct file_data *file_data){
+	long index=hashCode(file_name,buckets);
+	if(!map->dict[index]){
+
+			//this is the first word that hashed to that bucket
+			//init the bucket and linked list
+			struct listnode* node= malloc(sizeof(struct listnode));
+			node->word=malloc(strlen(file_name)+1);
+			node->next=NULL;
+			node->data=file_data;
+			map->dict[index]=node;
+	}
+	else{
+			struct listnode *node=map->dict[index];
+			int added=0;
+			while(node->next){
+				/*if(strcmp(node->word,file_name)==0){
+					node->count+=1;
+					added=1;	//printf(" %s:%ld\n",node->word,node->count);
+					break;
+				}
+				else*/
+				//assume no two files have the same name
+					node=node->next;
+			}
+
+			if(added==0){
+				/*if(strcmp(node->word,str)==0){
+					node->count+=1;
+				}
+				else{
+				*/
+					struct listnode* newword = malloc(sizeof(struct listnode));
+					newword->word=malloc(strlen(file_name)*sizeof(char)+1);
+					newword->data=file_data;
+					newword->next=NULL;
+					node->next=newword;
+				}
+				
+			
+		}	
+}
+
+
+		
 
 /* static functions */
 
