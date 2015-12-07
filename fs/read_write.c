@@ -19,8 +19,21 @@ testfs_read_block(struct inode *in, int log_block_nr, char *block)
 	} else {
 		log_block_nr -= NR_DIRECT_BLOCKS;
 
-		if (log_block_nr >= NR_INDIRECT_BLOCKS)
-			TBD();
+		if (log_block_nr >= NR_INDIRECT_BLOCKS){
+			/****************************************/
+			log_block_nr-= NR_INDIRECT_BLOCKS;
+			int quotient=log_block_nr/NR_INDIRECT_BLOCKS;
+			int remain=log_block_nr%NR_INDIRECT_BLOCKS;
+			if (in->in.i_dindirect > 0){
+				/* start at block number start and read nr blocks */
+		/*void read_blocks(struct super_block *sb, char *blocks, off_t start, size_t nr)*/
+				read_blocks(in->sb, block, in->in.i_dindirect, 1);
+				int second = ((int *)block)[quotient];
+				read_blocks(in->sb, block, second, 1);
+				phy_block_nr = ((int *)block)[remain];
+			}
+
+		}
 		if (in->in.i_indirect > 0) {
 			read_blocks(in->sb, block, in->in.i_indirect, 1);
 			phy_block_nr = ((int *)block)[log_block_nr];
@@ -35,7 +48,9 @@ testfs_read_block(struct inode *in, int log_block_nr, char *block)
 	}
 	return phy_block_nr;
 }
-
+/* read data from file associated with inode in. read up to size bytes of data
+ * into buffer buf, starting from offset start in file. on success, returns the
+ * number of bytes read. on error, returns a negative value. */
 int
 testfs_read_data(struct inode *in, char *buf, off_t start, size_t size)
 {
@@ -49,7 +64,28 @@ testfs_read_data(struct inode *in, char *buf, off_t start, size_t size)
 		size = in->in.i_size - start;
 	}
 	if (block_ix + size > BLOCK_SIZE) {
-		TBD();
+	/**************************************************/
+		if ((ret = testfs_read_block(in, block_nr, block)) < 0)
+			return ret;
+		memcpy(buf, block + block_ix, BLOCK_SIZE-block_ix);
+		unsigned int current=BLOCK_SIZE-block_ix;
+		block_nr++;
+		while(1){
+			if(current==size)	return size;
+			if(size-current>=BLOCK_SIZE){
+				if ((ret = testfs_read_block(in, block_nr, block)) < 0)
+					return ret;
+				memcpy(buf+current, block, BLOCK_SIZE);
+				block_nr++;
+				current+=BLOCK_SIZE;
+			}
+			else{
+				if ((ret = testfs_read_block(in, block_nr, block)) < 0)
+					return ret;
+				memcpy(buf+current, block, size-current);
+				return size;
+			}
+		}
 	}
 	if ((ret = testfs_read_block(in, block_nr, block)) < 0)
 		return ret;
@@ -116,6 +152,9 @@ testfs_allocate_block(struct inode *in, int log_block_nr, char *block)
 	return phy_block_nr;
 }
 
+/* write data to file associated with inode in. write len bytes of data from
+ * buffer buf, starting from offset off in file. on success, returns the number
+ * of bytes written. on error, returns a negative value. */
 int
 testfs_write_data(struct inode *in, const char *buf, off_t start, size_t size)
 {
