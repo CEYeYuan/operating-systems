@@ -21,7 +21,7 @@ testfs_read_block(struct inode *in, int log_block_nr, char *block)
 
 		if (log_block_nr >= NR_INDIRECT_BLOCKS){
 			/****************************************/
-			log_block_nr-= NR_INDIRECT_BLOCKS;
+			log_block_nr-= NR_IND7;IRECT_BLOCKS;
 			int quotient=log_block_nr/NR_INDIRECT_BLOCKS;
 			int remain=log_block_nr%NR_INDIRECT_BLOCKS;
 			if (in->in.i_dindirect > 0){
@@ -29,6 +29,8 @@ testfs_read_block(struct inode *in, int log_block_nr, char *block)
 		/*void read_blocks(struct super_block *sb, char *blocks, off_t start, size_t nr)*/
 				read_blocks(in->sb, block, in->in.i_dindirect, 1);
 				int second = ((int *)block)[quotient];
+				if(second==0)
+					return 0;
 				read_blocks(in->sb, block, second, 1);
 				phy_block_nr = ((int *)block)[remain];
 			}
