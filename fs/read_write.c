@@ -18,7 +18,7 @@ testfs_read_block(struct inode *in, int log_block_nr, char *block)
 		phy_block_nr = (int)in->in.i_block_nr[log_block_nr];
 	} else {
 		log_block_nr -= NR_DIRECT_BLOCKS;
-
+	
 		if (log_block_nr >= NR_INDIRECT_BLOCKS){
 			/****************************************/
 			log_block_nr-= NR_INDIRECT_BLOCKS;
@@ -36,6 +36,7 @@ testfs_read_block(struct inode *in, int log_block_nr, char *block)
 			}
 
 		}
+			
 		if (in->in.i_indirect > 0) {
 			read_blocks(in->sb, block, in->in.i_indirect, 1);
 			phy_block_nr = ((int *)block)[log_block_nr];
@@ -50,9 +51,7 @@ testfs_read_block(struct inode *in, int log_block_nr, char *block)
 	}
 	return phy_block_nr;
 }
-/* read data from file associated with inode in. read up to size bytes of data
- * into buffer buf, starting from offset start in file. on success, returns the
- * number of bytes read. on error, returns a negative value. */
+
 int
 testfs_read_data(struct inode *in, char *buf, off_t start, size_t size)
 {
@@ -106,12 +105,6 @@ testfs_allocate_block(struct inode *in, int log_block_nr, char *block)
 	char indirect[BLOCK_SIZE];
 	int indirect_allocated = 0;
 
-	char dindirect[BLOCK_SIZE];
-	int dindirect_allocated = 0;
-
-	char secondirect[BLOCK_SIZE];
-	int secondirect_allocated = 0;
-
 	assert(log_block_nr >= 0);
 	phy_block_nr = testfs_read_block(in, log_block_nr, block);
 
@@ -132,49 +125,49 @@ testfs_allocate_block(struct inode *in, int log_block_nr, char *block)
 
 	log_block_nr -= NR_DIRECT_BLOCKS;
 	if (log_block_nr >= NR_INDIRECT_BLOCKS){
-		/**********************************************/
-		log_block_nr -= NR_INDIRECT_BLOCKS;
-		
-		if (in->in.i_dindirect == 0) {	/* allocate an dindirect block */
+	/*************************************************************/
+		log_block_nr-=NR_INDIRECT_BLOCKS;
+		char dindirect[BLOCK_SIZE];
+		char indir[BLOCK_SIZE];
+		int dindirect_allocated = 0;
+		int indir_allocated=0;
+		if(in->in.i_dindirect == 0){
 			bzero(dindirect, BLOCK_SIZE);
 			phy_block_nr = testfs_alloc_block_for_inode(in);
 			if (phy_block_nr < 0)
 				return phy_block_nr;
 			dindirect_allocated = 1;
 			in->in.i_dindirect = phy_block_nr;
-		} 	/* read indirect block */
-		read_blocks(in->sb, dindirect, in->in.i_dindirect, 1);
-		
-		unsigned int quotient,remain;
-		quotient=log_block_nr/NR_DIRECT_BLOCKS;
-		remain=log_block_nr%NR_DIRECT_BLOCKS;
-			/* allocate indirect block */
-		if(((int *)dindirect)[quotient] == 0){
+		}else {	/* read indirect block */
+			read_blocks(in->sb, dindirect, in->in.i_dindirect, 1);
+		}
+
+		int index=log_block_nr/(BLOCK_SIZE/4);
+		int offset=log_block_nr%(BLOCK_SIZE/4);
+		if(((int *)dindirect)[index]==0){
+			bzero(indir, BLOCK_SIZE);
 			phy_block_nr = testfs_alloc_block_for_inode(in);
-			if (phy_block_nr >= 0) {
-				((int *)dindirect)[quotient] = phy_block_nr;
-				write_blocks(in->sb, dindirect, in->in.i_dindirect, 1);
-				secondirect_allocated = 1;
-			} else if (dindirect_allocated) {
-				testfs_free_block_from_inode(in, in->in.i_dindirect);
+			if (phy_block_nr < 0){
+				if(dindirect_allocated==1)
+					testfs_free_block_from_inode(in, in->in.i_dindirect);
 				return phy_block_nr;
 			}
+			((int*)dindirect)[index]=phy_block_nr;
+			//indir_allocated=1;
+			write_blocks(in->sb, dindirect, in->in.i_dindirect, 1);
 		}
-	//
-		read_blocks(in->sb, secondirect, ((int*)dindirect)[quotient], 1);
-	//	
-		if(((int *)secondirect)[remain] == 0){
+			read_blocks(in->sb, indir, ((int *)dindirect)[index], 1);
+			assert(((int *)indir)[offset]==0);
 			phy_block_nr = testfs_alloc_block_for_inode(in);
-			if (phy_block_nr >= 0) {
-				((int *)secondirect)[remain] = phy_block_nr;
-				write_blocks(in->sb, secondirect, ((int *)dindirect)[quotient], 1);
-                                write_blocks(in->sb,  dindirect, in->in.i_dindirect, 1);
-			} else if (secondirect_allocated) {
-				testfs_free_block_from_inode(in, ((int *)dindirect)[quotient]);
+			if (phy_block_nr < 0){
+				if(indir_allocated==1)
+					testfs_free_block_from_inode(in, ((int *)dindirect)[index]);
 				return phy_block_nr;
 			}
-		}
-		return phy_block_nr;
+			((int *)indir)[offset]=phy_block_nr;
+			write_blocks(in->sb,indir, ((int *)dindirect)[index], 1);
+			write_blocks(in->sb,dindirect, in->in.i_dindirect, 1);
+			return phy_block_nr;
 
 	}
 
@@ -196,8 +189,6 @@ testfs_allocate_block(struct inode *in, int log_block_nr, char *block)
 	if (phy_block_nr >= 0) {
 		/* update indirect block */
 		((int *)indirect)[log_block_nr] = phy_block_nr;
-	/* start at block number start and write nr blocks 
-	write_blocks(struct super_block *sb, const char *blocks, off_t start,size_t nr);*/
 		write_blocks(in->sb, indirect, in->in.i_indirect, 1);
 	} else if (indirect_allocated) {
 		/* free the indirect block that was allocated */
@@ -206,9 +197,6 @@ testfs_allocate_block(struct inode *in, int log_block_nr, char *block)
 	return phy_block_nr;
 }
 
-/* write data to file associated with inode in. write size bytes of data from
- * buffer buf, starting from offset off in file. on success, returns the number
- * of bytes written. on error, returns a negative value. */
 int
 testfs_write_data(struct inode *in, const char *buf, off_t start, size_t size)
 {
@@ -253,14 +241,13 @@ testfs_write_data(struct inode *in, const char *buf, off_t start, size_t size)
 		/* return the number of bytes written or any error */
 		return size;
 	}
+
 	/* ret is the newly allocated physical block number */
 	ret = testfs_allocate_block(in, block_nr, block);
 	if (ret < 0)
 		return ret;
 	memcpy(block + block_ix, buf, size);
 	write_blocks(in->sb, block, ret, 1);
-	/* start at block number start and write nr blocks */
-/*void write_blocks(struct super_block *sb, const char *blocks, off_t start,size_t nr)*/
 	/* increment i_size by the number of bytes written. */
 	if (size > 0)
 		in->in.i_size = MAX(in->in.i_size, start + (off_t) size);
