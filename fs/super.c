@@ -246,6 +246,8 @@ testfs_free_block(struct super_block *sb, int block_nr)
 
 	zero_blocks(sb, block_nr, 1);
 	block_nr -= sb->sb.data_blocks_start;
+
+	//printf("block nr: %d\n",block_nr );
 	assert(block_nr >= 0);
 	testfs_put_block_freemap(sb, block_nr);
 	assert(sb->sb.used_block_count > 0);

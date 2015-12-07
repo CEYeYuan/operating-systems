@@ -2,9 +2,7 @@ PASS
 FAIL
 The output of this script is stored in test_rw_large.out
 The output of this script should be tests/test_rw_large.txt
-FAIL
-The output of this script is stored in test_rw_no_space.out
-The output of this script should be tests/test_rw_no_space.txt
+PASS
 FAIL
 The output of this script is stored in test_rw_too_big.out
 The output of this script should be tests/test_rw_too_big.txt

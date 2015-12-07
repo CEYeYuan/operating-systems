@@ -305,15 +305,18 @@ testfs_free_blocks(struct inode *in)
 		
 		for(i=0;i<quotient;i++){	
 			int second = ((int *)block)[i];	
-			char second_block[BLOCK_SIZE];
-			
-			read_blocks(in->sb, second_block, second, 1);
-			for(j=0;j<NR_INDIRECT_BLOCKS; j++){
-				testfs_free_block_from_inode(in, ((int *)second_block)[j]);
-				((int *)second_block)[j] = 0;
+			if ( second > 0 )
+			{
+				char second_block[BLOCK_SIZE];
+				read_blocks(in->sb, second_block, second, 1);
+				for(j=0;j<NR_INDIRECT_BLOCKS; j++){
+					testfs_free_block_from_inode(in, ((int *)second_block)[j]);
+					((int *)second_block)[j] = 0;
+				}
+				testfs_free_block_from_inode(in, second);
 			}
-			testfs_free_block_from_inode(in, second);
 		}
+		
 		read_blocks(in->sb, block, in->in.i_dindirect, 1);
 		int second = ((int *)block)[quotient];
 		char second_block[BLOCK_SIZE];
@@ -323,7 +326,9 @@ testfs_free_blocks(struct inode *in)
 			((int *)second_block)[k] = 0;
 		}
 		testfs_free_block_from_inode(in, ((int *)block)[quotient]);
+		((int *)block)[quotient]=0;
 		testfs_free_block_from_inode(in, in->in.i_dindirect);
+			
 	}
 
 	in->in.i_size = 0;
