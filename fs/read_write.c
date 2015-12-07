@@ -21,7 +21,7 @@ testfs_read_block(struct inode *in, int log_block_nr, char *block)
 
 		if (log_block_nr >= NR_INDIRECT_BLOCKS){
 			/****************************************/
-			log_block_nr-= NR_IND7;IRECT_BLOCKS;
+			log_block_nr-= NR_INDIRECT_BLOCKS;
 			int quotient=log_block_nr/NR_INDIRECT_BLOCKS;
 			int remain=log_block_nr%NR_INDIRECT_BLOCKS;
 			if (in->in.i_dindirect > 0){
@@ -133,6 +133,8 @@ testfs_allocate_block(struct inode *in, int log_block_nr, char *block)
 	log_block_nr -= NR_DIRECT_BLOCKS;
 	if (log_block_nr >= NR_INDIRECT_BLOCKS){
 		/**********************************************/
+		log_block_nr -= NR_INDIRECT_BLOCKS;
+		
 		if (in->in.i_dindirect == 0) {	/* allocate an dindirect block */
 			bzero(dindirect, BLOCK_SIZE);
 			phy_block_nr = testfs_alloc_block_for_inode(in);
@@ -140,13 +142,13 @@ testfs_allocate_block(struct inode *in, int log_block_nr, char *block)
 				return phy_block_nr;
 			dindirect_allocated = 1;
 			in->in.i_dindirect = phy_block_nr;
-		} else {	/* read indirect block */
-			read_blocks(in->sb, dindirect, in->in.i_dindirect, 1);
-		}
+		} 	/* read indirect block */
+		read_blocks(in->sb, dindirect, in->in.i_dindirect, 1);
+		
 		unsigned int quotient,remain;
 		quotient=log_block_nr/NR_DIRECT_BLOCKS;
 		remain=log_block_nr%NR_DIRECT_BLOCKS;
-			/* allocate direct block */
+			/* allocate indirect block */
 		if(((int *)dindirect)[quotient] == 0){
 			phy_block_nr = testfs_alloc_block_for_inode(in);
 			if (phy_block_nr >= 0) {
@@ -158,16 +160,17 @@ testfs_allocate_block(struct inode *in, int log_block_nr, char *block)
 				return phy_block_nr;
 			}
 		}
-		else{
-			read_blocks(in->sb, secondirect, dindirect[quotient], 1);
-		}	
+	//
+		read_blocks(in->sb, secondirect, ((int*)dindirect)[quotient], 1);
+	//	
 		if(((int *)secondirect)[remain] == 0){
 			phy_block_nr = testfs_alloc_block_for_inode(in);
 			if (phy_block_nr >= 0) {
 				((int *)secondirect)[remain] = phy_block_nr;
-				write_blocks(in->sb, secondirect, dindirect[quotient], 1);
+				write_blocks(in->sb, secondirect, ((int *)dindirect)[quotient], 1);
+                                write_blocks(in->sb,  dindirect, in->in.i_dindirect, 1);
 			} else if (secondirect_allocated) {
-				testfs_free_block_from_inode(in, dindirect[quotient]);
+				testfs_free_block_from_inode(in, ((int *)dindirect)[quotient]);
 				return phy_block_nr;
 			}
 		}
@@ -307,22 +310,25 @@ testfs_free_blocks(struct inode *in)
 		int remain=e_block_nr %NR_INDIRECT_BLOCKS;
 		read_blocks(in->sb, block, in->in.i_dindirect, 1);
 		for(i=0;i<quotient;i++){	
-			int second = ((int *)block)[i];
-			
-			read_blocks(in->sb, block, second, 1);
+			int second = ((int *)block)[i];	
+			char second_block[BLOCK_SIZE];
+			read_blocks(in->sb, second_block, second, 1);
 			for(j=0;j<NR_INDIRECT_BLOCKS; j++){
-				testfs_free_block_from_inode(in, block[j]);
-				((int *)block)[j] = 0;
+				testfs_free_block_from_inode(in, second_block[j]);
+				((int *)second_block)[j] = 0;
 			}
-			testfs_free_block_from_inode(in, in->in.i_indirect);
+			testfs_free_block_from_inode(in, second);
 		}
 		read_blocks(in->sb, block, in->in.i_dindirect, 1);
 		int second = ((int *)block)[quotient];
-		read_blocks(in->sb, block, second, 1);
+		char second_block[BLOCK_SIZE];
+		read_blocks(in->sb, second_block, second, 1);
 		for(k=0;k<remain;k++){
-			testfs_free_block_from_inode(in, ((int *)block)[k]);
-			((int *)block)[k] = 0;
+			testfs_free_block_from_inode(in, ((int *)second_block)[k]);
+			((int *)second_block)[k] = 0;
 		}
+		testfs_free_block_from_inode(in, ((int *)block)[quotient]);
+		testfs_free_block_from_inode(in, in->in.i_dindirect);
 	}
 
 	in->in.i_size = 0;
