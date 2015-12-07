@@ -74,7 +74,7 @@ testfs_read_data(struct inode *in, char *buf, off_t start, size_t size)
 			if(current==size)	return size;
 			if(size-current>=BLOCK_SIZE){
 				if ((ret = testfs_read_block(in, block_nr, block)) < 0)
-					return ret;
+					return  EFBIG;
 				memcpy(buf+current, block, BLOCK_SIZE);
 				block_nr++;
 				current+=BLOCK_SIZE;
@@ -152,7 +152,7 @@ testfs_allocate_block(struct inode *in, int log_block_nr, char *block)
 	return phy_block_nr;
 }
 
-/* write data to file associated with inode in. write len bytes of data from
+/* write data to file associated with inode in. write size bytes of data from
  * buffer buf, starting from offset off in file. on success, returns the number
  * of bytes written. on error, returns a negative value. */
 int
@@ -164,7 +164,40 @@ testfs_write_data(struct inode *in, const char *buf, off_t start, size_t size)
 	int ret;
 
 	if (block_ix + size > BLOCK_SIZE) {
-		TBD();
+		/************************************************/
+		unsigned int current;
+		ret = testfs_allocate_block(in, block_nr, block);
+		if (ret < 0)
+			return ret;
+		memcpy(block + block_ix, buf, BLOCK_SIZE-block_ix);
+		write_blocks(in->sb, block, ret, 1);
+		current=BLOCK_SIZE-block_ix;
+		block_nr++;
+		while(1){
+			if(current==size)	break;
+			if(size-current>=BLOCK_SIZE){
+				ret = testfs_allocate_block(in, block_nr, block);
+				if (ret < 0)
+					return  EFBIG;
+				memcpy(block,buf+current, BLOCK_SIZE);
+				write_blocks(in->sb, block, ret, 1);
+				current+=BLOCK_SIZE;
+				block_nr++;
+			}
+			else{
+				ret = testfs_allocate_block(in, block_nr, block);
+				if (ret < 0)
+					return  EFBIG;
+				memcpy(block, buf+current, size-current);
+				write_blocks(in->sb, block, ret, 1);
+				current=size;
+			}
+		}
+		if (size > 0)
+		in->in.i_size = MAX(in->in.i_size, start + (off_t) size);
+		in->i_flags |= I_FLAGS_DIRTY;
+		/* return the number of bytes written or any error */
+		return size;
 	}
 	/* ret is the newly allocated physical block number */
 	ret = testfs_allocate_block(in, block_nr, block);
@@ -172,6 +205,8 @@ testfs_write_data(struct inode *in, const char *buf, off_t start, size_t size)
 		return ret;
 	memcpy(block + block_ix, buf, size);
 	write_blocks(in->sb, block, ret, 1);
+	/* start at block number start and write nr blocks */
+/*void write_blocks(struct super_block *sb, const char *blocks, off_t start,size_t nr)*/
 	/* increment i_size by the number of bytes written. */
 	if (size > 0)
 		in->in.i_size = MAX(in->in.i_size, start + (off_t) size);
