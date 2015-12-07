@@ -1,13 +1,3 @@
-
-
-
-
-
-
-
-
-
-
 #include "testfs.h"
 #include "list.h"
 #include "super.h"
@@ -114,6 +104,12 @@ testfs_allocate_block(struct inode *in, int log_block_nr, char *block)
 	char indirect[BLOCK_SIZE];
 	int indirect_allocated = 0;
 
+	char dindirect[BLOCK_SIZE];
+	int dindirect_allocated = 0;
+
+	char secondirect[BLOCK_SIZE];
+	int secondirect_allocated = 0;
+
 	assert(log_block_nr >= 0);
 	phy_block_nr = testfs_read_block(in, log_block_nr, block);
 
@@ -133,8 +129,49 @@ testfs_allocate_block(struct inode *in, int log_block_nr, char *block)
 	}
 
 	log_block_nr -= NR_DIRECT_BLOCKS;
-	if (log_block_nr >= NR_INDIRECT_BLOCKS)
-		TBD();
+	if (log_block_nr >= NR_INDIRECT_BLOCKS){
+		/**********************************************/
+		if (in->in.i_dindirect == 0) {	/* allocate an dindirect block */
+			bzero(dindirect, BLOCK_SIZE);
+			phy_block_nr = testfs_alloc_block_for_inode(in);
+			if (phy_block_nr < 0)
+				return phy_block_nr;
+			dindirect_allocated = 1;
+			in->in.i_dindirect = phy_block_nr;
+		} else {	/* read indirect block */
+			read_blocks(in->sb, dindirect, in->in.i_dindirect, 1);
+		}
+		unsigned int quotient,remain;
+		quotient=log_block_nr/NR_DIRECT_BLOCKS;
+		remain=log_block_nr%NR_DIRECT_BLOCKS;
+			/* allocate direct block */
+		if(((int *)dindirect)[quotient] == 0){
+			phy_block_nr = testfs_alloc_block_for_inode(in);
+			if (phy_block_nr >= 0) {
+				((int *)dindirect)[quotient] = phy_block_nr;
+				write_blocks(in->sb, dindirect, in->in.i_dindirect, 1);
+				secondirect_allocated = 1;
+			} else if (dindirect_allocated) {
+				testfs_free_block_from_inode(in, in->in.i_dindirect);
+				return phy_block_nr;
+			}
+		}
+		else{
+			read_blocks(in->sb, secondirect, dindirect[quotient], 1);
+		}	
+		if(((int *)secondirect)[remain] == 0){
+			phy_block_nr = testfs_alloc_block_for_inode(in);
+			if (phy_block_nr >= 0) {
+				((int *)secondirect)[remain] = phy_block_nr;
+				write_blocks(in->sb, secondirect, dindirect[quotient], 1);
+			} else if (secondirect_allocated) {
+				testfs_free_block_from_inode(in, dindirect[quotient]);
+				return phy_block_nr;
+			}
+		}
+		return phy_block_nr;
+
+	}
 
 	if (in->in.i_indirect == 0) {	/* allocate an indirect block */
 		bzero(indirect, BLOCK_SIZE);
@@ -154,6 +191,8 @@ testfs_allocate_block(struct inode *in, int log_block_nr, char *block)
 	if (phy_block_nr >= 0) {
 		/* update indirect block */
 		((int *)indirect)[log_block_nr] = phy_block_nr;
+	/* start at block number start and write nr blocks 
+	write_blocks(struct super_block *sb, const char *blocks, off_t start,size_t nr);*/
 		write_blocks(in->sb, indirect, in->in.i_indirect, 1);
 	} else if (indirect_allocated) {
 		/* free the indirect block that was allocated */
