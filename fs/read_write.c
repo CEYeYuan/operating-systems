@@ -1,3 +1,13 @@
+
+
+
+
+
+
+
+
+
+
 #include "testfs.h"
 #include "list.h"
 #include "super.h"
@@ -247,7 +257,29 @@ testfs_free_blocks(struct inode *in)
 
 	e_block_nr -= NR_INDIRECT_BLOCKS;
 	if (e_block_nr >= 0) {
-		TBD();
+	/**********************************************************/
+			/* start at block number start and read nr blocks */
+		/*void read_blocks(struct super_block *sb, char *blocks, off_t start, size_t nr)*/
+		char block[BLOCK_SIZE];
+		int i,j,k;
+		int quotient=e_block_nr /NR_INDIRECT_BLOCKS;
+		int remain=e_block_nr %NR_INDIRECT_BLOCKS;
+		read_blocks(in->sb, block, in->in.i_dindirect, 1);
+		for(i=0;i<quotient;i++){	
+			int second = ((int *)block)[i];
+			read_blocks(in->sb, block, second, 1);
+			for(j=0;j<NR_INDIRECT_BLOCKS; j++){
+				testfs_free_block_from_inode(in, ((int *)block)[j]);
+				((int *)block)[j] = 0;
+			}
+		}
+		read_blocks(in->sb, block, in->in.i_dindirect, 1);
+		int second = ((int *)block)[quotient];
+		read_blocks(in->sb, block, second, 1);
+		for(k=0;k<remain;k++){
+			testfs_free_block_from_inode(in, ((int *)block)[k]);
+			((int *)block)[k] = 0;
+		}
 	}
 
 	in->in.i_size = 0;
