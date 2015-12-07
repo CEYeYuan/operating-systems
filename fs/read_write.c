@@ -75,7 +75,7 @@ testfs_read_data(struct inode *in, char *buf, off_t start, size_t size)
 			if(current==size)	return size;
 			if(size-current>=BLOCK_SIZE){
 				if ((ret = testfs_read_block(in, block_nr, block)) < 0)
-					return  EFBIG;
+					return  -EFBIG;
 				memcpy(buf+current, block, BLOCK_SIZE);
 				block_nr++;
 				current+=BLOCK_SIZE;
@@ -225,7 +225,7 @@ testfs_write_data(struct inode *in, const char *buf, off_t start, size_t size)
 			if(size-current>=BLOCK_SIZE){
 				ret = testfs_allocate_block(in, block_nr, block);
 				if (ret < 0)
-					return  EFBIG;
+					return  -EFBIG;
 				memcpy(block,buf+current, BLOCK_SIZE);
 				write_blocks(in->sb, block, ret, 1);
 				current+=BLOCK_SIZE;
@@ -234,7 +234,7 @@ testfs_write_data(struct inode *in, const char *buf, off_t start, size_t size)
 			else{
 				ret = testfs_allocate_block(in, block_nr, block);
 				if (ret < 0)
-					return  EFBIG;
+					return  -EFBIG;
 				memcpy(block, buf+current, size-current);
 				write_blocks(in->sb, block, ret, 1);
 				current=size;

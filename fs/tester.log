@@ -1,7 +1,5 @@
 PASS
-FAIL
-The output of this script is stored in test_rw_large.out
-The output of this script should be tests/test_rw_large.txt
+PASS
 PASS
 FAIL
 The output of this script is stored in test_rw_too_big.out
