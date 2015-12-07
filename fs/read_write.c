@@ -308,11 +308,13 @@ testfs_free_blocks(struct inode *in)
 		read_blocks(in->sb, block, in->in.i_dindirect, 1);
 		for(i=0;i<quotient;i++){	
 			int second = ((int *)block)[i];
+			
 			read_blocks(in->sb, block, second, 1);
 			for(j=0;j<NR_INDIRECT_BLOCKS; j++){
-				testfs_free_block_from_inode(in, ((int *)block)[j]);
+				testfs_free_block_from_inode(in, block[j]);
 				((int *)block)[j] = 0;
 			}
+			testfs_free_block_from_inode(in, in->in.i_indirect);
 		}
 		read_blocks(in->sb, block, in->in.i_dindirect, 1);
 		int second = ((int *)block)[quotient];
