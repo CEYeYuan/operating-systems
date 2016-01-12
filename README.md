@@ -11,7 +11,7 @@ In order to eliminate the various complexities of computer systems and dealing w
 **Technologies Used:** C
 
 **Labs Include:**
-  - **Lab 1* C programming warmup, including building a non-memory-leaked singly linked list and hashmap.
+  - **Lab 1** C programming warmup, including building a non-memory-leaked singly linked list and hashmap.
   - **Lab 2:** Designed a User Level Threads Package. Implemented thread yield, thread exit, and thread create functions. 
       No pre-emption, so threads have to voluntarily yield CPU to each other.
   - **Lab 3:** This lab builds on Lab 2. Implemented condition variables and blocking locks. 
