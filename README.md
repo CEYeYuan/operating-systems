@@ -17,5 +17,5 @@ In order to eliminate the various complexities of computer systems and dealing w
   - **Lab 3:** This lab builds on Lab 2. Implemented condition variables and blocking locks. 
   - **Lab 4:** Solution for the producer and consumer fixed-buffer concurrency problem (fixed-threads pool webserver) using pthreads, 
 mutex locks and condition variables.
- - **Lab 4:** Based on lab4, added in caching. Using LRU cache to improve the performance and cache hit rate.
- - **Lab 6:** Working on a simple file system which supports very large (4TB) files. Structures include super blocks, inode blocks and data blocks.
+   - **Lab 5:** Based on lab4, added in caching. Using LRU cache to improve the performance and cache hit rate.
+   - **Lab 6:** Working on a simple file system which supports very large (4TB) files. Structures include super blocks, inode blocks and data blocks.
